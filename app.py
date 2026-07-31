@@ -2,7 +2,6 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import matplotlib.patches as patches
-import matplotlib.path as mpath
 import numpy as np
 import urllib.request
 import os
@@ -223,7 +222,7 @@ if selected_tool == "🌳 사례관리 생태도":
     st.download_button(label="💾 생태도 고화질 이미지 다운로드 (PNG)", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png")
 
 # =============================================================
-# [MODE 2] 가계도 모드 (순수 Numpy 볼록 껍질 기반 자유 곡선 동거 영역)
+# [MODE 2] 가계도 모드 (통합 동거 영역 + 비동거 자녀 분리 배치 최적화)
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
@@ -276,7 +275,7 @@ else:
         grand_children = [m for m in members if "손자" in m['relation']]
         pets = [m for m in members if "반려동물" in m['relation']]
 
-        cohabit_points = []
+        cohabit_coords = []
 
         def draw_person(x, y, name, age, gender, is_alive, is_target=False):
             box_s = 0.18
@@ -306,14 +305,14 @@ else:
         cx, cy = (0, 0.25) if (not spouse and not cohabitants) else (-0.45, 0.25)
         draw_person(cx, cy, client['name'], client['age'], client['gender'], client['is_alive'], is_target=True)
         if client.get('is_cohabit', True): 
-            cohabit_points.append((cx, cy))
+            cohabit_coords.append((cx, cy))
 
         if spouse:
             sx, sy = (0.45, 0.25)
             sp = spouse[0]
             draw_person(sx, sy, sp['name'], sp['age'], sp['gender'], sp['is_alive'])
             if sp.get('is_cohabit', False): 
-                cohabit_points.append((sx, sy))
+                cohabit_coords.append((sx, sy))
 
             rel = sp.get('rel_type', '동거/혼인')
             mid_x = (cx + sx) / 2
@@ -363,7 +362,7 @@ else:
             coh_x, coh_y = (0.45, 0.25)
             draw_person(coh_x, coh_y, coh['name'], coh['age'], coh['gender'], coh['is_alive'])
             if coh.get('is_cohabit', True): 
-                cohabit_points.append((coh_x, coh_y))
+                cohabit_coords.append((coh_x, coh_y))
 
             mid_x = (cx + coh_x) / 2
             lbl_bbox = dict(boxstyle="round,pad=0.2", fc="#FFFFFF", ec="none", alpha=0.85)
@@ -381,11 +380,11 @@ else:
             if father:
                 draw_person(p_fx, py, father[0]['name'], father[0]['age'], father[0]['gender'], father[0]['is_alive'])
                 if father[0].get('is_cohabit'): 
-                    cohabit_points.append((p_fx, py))
+                    cohabit_coords.append((p_fx, py))
             if mother:
                 draw_person(p_mx, py, mother[0]['name'], mother[0]['age'], mother[0]['gender'], mother[0]['is_alive'])
                 if mother[0].get('is_cohabit'): 
-                    cohabit_points.append((p_mx, py))
+                    cohabit_coords.append((p_mx, py))
 
             if father and mother:
                 ax.plot([p_fx + 0.1, p_mx - 0.1], [py, py], color='#B2BEC3', linestyle='--', lw=1.2, zorder=1)
@@ -424,27 +423,31 @@ else:
                 ch = group['child']
 
                 if group['type'] == 'single':
-                    draw_person(gx, chy, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
+                    # [시각적 개선] 동거하는 자녀는 위쪽(y = -0.32)으로 살짝 단차를 두어 동거 영역에 자연스럽게 포용
+                    node_y = chy + 0.06 if ch.get('is_cohabit') else chy
+                    draw_person(gx, node_y, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
                     child_coords_map[group['child_idx']] = gx
                     if ch.get('is_cohabit'): 
-                        cohabit_points.append((gx, chy))
+                        cohabit_coords.append((gx, node_y))
                 else:
                     il = group['in_law']
                     ch_x = gx - 0.15
                     il_x = gx + 0.15
                     
-                    draw_person(ch_x, chy, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
-                    draw_person(il_x, chy, il['name'], il['age'], il['gender'], il['is_alive'])
+                    c_y = chy + 0.06 if ch.get('is_cohabit') else chy
+                    i_y = chy + 0.06 if il.get('is_cohabit') else chy
+
+                    draw_person(ch_x, c_y, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
+                    draw_person(il_x, i_y, il['name'], il['age'], il['gender'], il['is_alive'])
                     
-                    ax.plot([ch_x + 0.09, il_x - 0.09], [chy, chy], color='#2D3436', lw=1.2, zorder=2)
+                    ax.plot([ch_x + 0.09, il_x - 0.09], [c_y, i_y], color='#2D3436', lw=1.2, zorder=2)
                     
                     child_coords_map[group['child_idx']] = ch_x
                     if ch.get('is_cohabit'): 
-                        cohabit_points.append((ch_x, chy))
+                        cohabit_coords.append((ch_x, c_y))
                     if il.get('is_cohabit'): 
-                        cohabit_points.append((il_x, chy))
+                        cohabit_coords.append((il_x, i_y))
 
-                    # 4. 손자/손녀 (4세대)
                     if grand_children:
                         gcy = -0.92
                         gc_mid = (ch_x + il_x) / 2
@@ -459,7 +462,7 @@ else:
                             draw_person(grx, gcy, gc['name'], gc['age'], gc['gender'], gc['is_alive'])
                             ax.plot([grx, grx], [chy - 0.2, gcy + 0.1], color='#2D3436', lw=1.2, zorder=1)
                             if gc.get('is_cohabit'): 
-                                cohabit_points.append((grx, gcy))
+                                cohabit_coords.append((grx, gcy))
 
             real_ch_xs = [child_coords_map[k] for k in sorted(child_coords_map.keys())]
 
@@ -504,90 +507,25 @@ else:
             pet_x = 1.10
             for p_idx, pt in enumerate(pets):
                 px = pet_x - (p_idx * 0.28)
-                draw_person(px, pet_y, pt['name'], pt['age'], pt['gender'], pt['is_alive'])
+                p_y = pet_y + 0.06 if pt.get('is_cohabit') else pet_y
+                draw_person(px, p_y, pt['name'], pt['age'], pt['gender'], pt['is_alive'])
                 if pt.get('is_cohabit'): 
-                    cohabit_points.append((px, pet_y))
+                    cohabit_points.append((px, p_y))
 
-        # 6. [순수 Numpy 기반 동적 곡선 외곽선] 동거인들만 부드럽게 감싸는 버블 영역 생성
-        if len(cohabit_points) > 0:
-            pts = np.array(cohabit_points)
+        # 6. [통합 동거 영역 버블 박스] 동거인들만 한데 감싸는 깔끔한 영역
+        if len(cohabit_coords) > 0:
+            pts = np.array(cohabit_coords)
+            min_x, max_x = min(pts[:, 0]) - 0.22, max(pts[:, 0]) + 0.22
+            min_y, max_y = min(pts[:, 1]) - 0.20, max(pts[:, 1]) + 0.20
+            w, h = max_x - min_x, max_y - min_y
             
-            if len(pts) == 1:
-                px, py = pts[0]
-                co_bubble = patches.FancyBboxPatch(
-                    (px - 0.18, py - 0.18), 0.36, 0.38,
-                    boxstyle="round,pad=0.08,rounding_size=0.15",
-                    facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
-                )
-                ax.add_patch(co_bubble)
-                ax.text(px - 0.16, py + 0.16, "🏠 동거 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'), color='#1B5E20', zorder=1)
-            else:
-                # 1단계: 순수 Numpy로 볼록 껍질(Convex Hull) 정점 구하기
-                def compute_convex_hull(points):
-                    points = points[np.lexsort((points[:, 1], points[:, 0]))]
-                    def cross(o, a, b):
-                        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
-                    lower = []
-                    for p in points:
-                        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
-                            lower.pop()
-                        lower.append(p)
-                    upper = []
-                    for p in reversed(points):
-                        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
-                            upper.pop()
-                        upper.append(p)
-                    return np.array(lower[:-1] + upper[:-1])
-
-                hull_pts = compute_convex_hull(pts)
-                if len(hull_pts) < 3:
-                    # 점이 일직선 상에 있거나 할 때는 안전하게 바운딩 박스 처리
-                    min_x, max_x = min(pts[:, 0]) - 0.22, max(pts[:, 0]) + 0.22
-                    min_y, max_y = min(pts[:, 1]) - 0.20, max(pts[:, 1]) + 0.20
-                    w, h = max_x - min_x, max_y - min_y
-                    co_bubble = patches.FancyBboxPatch(
-                        (min_x, min_y), w, h,
-                        boxstyle="round,pad=0.08,rounding_size=0.15",
-                        facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
-                    )
-                    ax.add_patch(co_bubble)
-                    ax.text(min_x + 0.02, max_y + 0.02, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), color='#1B5E20', zorder=1)
-                else:
-                    # 2단계: 외곽선 바깥으로 여유 공간(Margin) 확장
-                    center = np.mean(pts, axis=0)
-                    expanded_pts = []
-                    for pt in hull_pts:
-                        vec = pt - center
-                        norm = np.linalg.norm(vec)
-                        vec_n = vec / norm if norm != 0 else vec
-                        expanded_pts.append(pt + vec_n * 0.25)
-                    expanded_pts = np.array(expanded_pts)
-
-                    # 3단계: 부드러운 곡선 패치(Path) 생성하여 동거인들만 유기적으로 감싸기
-                    verts = []
-                    codes = []
-                    n_hull = len(expanded_pts)
-                    for i in range(n_hull):
-                        p0 = expanded_pts[i]
-                        p1 = expanded_pts[(i + 1) % n_hull]
-                        if i == 0:
-                            verts.append(p0)
-                            codes.append(mpath.Path.MOVETO)
-                        mid = (p0 + p1) / 2
-                        verts.append(mid)
-                        codes.append(mpath.Path.CURVE3)
-                        verts.append(p1)
-                        codes.append(mpath.Path.CURVE3)
-
-                    verts.append(expanded_pts[0])
-                    codes.append(mpath.Path.CLOSEPOLY)
-
-                    path = mpath.Path(verts, codes)
-                    patch = patches.PathPatch(path, facecolor='#E8F5E9', edgecolor='#2E7D32', linestyle='--', linewidth=1.8, alpha=0.35, zorder=0)
-                    ax.add_patch(patch)
-                    
-                    top_idx = np.argmax(expanded_pts[:, 1])
-                    ax.text(expanded_pts[top_idx][0] - 0.15, expanded_pts[top_idx][1] + 0.03, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), color='#1B5E20', zorder=1)
+            co_bubble = patches.FancyBboxPatch(
+                (min_x, min_y), w, h,
+                boxstyle="round,pad=0.08,rounding_size=0.15",
+                facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
+            )
+            ax.add_patch(co_bubble)
+            ax.text(min_x + 0.02, max_y + 0.02, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), color='#1B5E20', zorder=1)
 
         ax.text(0, -1.38, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#636E72')
         
