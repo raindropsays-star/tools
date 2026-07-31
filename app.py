@@ -2,12 +2,10 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import matplotlib.patches as patches
-import matplotlib.path as mpath
 import numpy as np
 import urllib.request
 import os
 import io
-from scipy.spatial import ConvexHull
 
 # 1. 한글 폰트(나눔고딕) 자동 다운로드 및 적용
 @st.cache_resource
@@ -193,7 +191,7 @@ if selected_tool == "🌳 사례관리 생태도":
             bx, by = get_box_intersection_precise(x, y, box_w, box_h, 0, 0)
             
             angle = np.arctan2(y, x)
-            cx = (center_r + 0.01) * np.cos(angle)
+            cx = (center_r + 0.01) np.cos(angle)
             cy = (center_r + 0.01) * np.sin(angle)
 
             if "체계 ➔ 대상자" in n['direction']:
@@ -228,7 +226,7 @@ if selected_tool == "🌳 사례관리 생태도":
     st.download_button(label="💾 생태도 고화질 이미지 다운로드 (PNG)", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png")
 
 # =============================================================
-# [MODE 2] 가계도 모드 (Convex Hull 자유 곡선 동거 영역 및 가변 배치 적용)
+# [MODE 2] 가계도 모드 (순수 Numpy 기반 외곽선 동거 영역 및 가변 배치)
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
@@ -394,7 +392,7 @@ else:
                 ax.plot([0, cx], [p_mid_y, p_mid_y], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
                 ax.plot([cx, cx], [p_mid_y, cy + 0.1], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
 
-        # 3. 자녀 세대 가변 폭 배치 (식구 수 비례 넓은 X축 동적 확보)
+        # 3. 자녀 세대 가변 폭 배치
         if children:
             chy = -0.38
             branch_y = -0.05
@@ -410,7 +408,6 @@ else:
             group_count = len(family_groups)
             parent_mid_x = (cx + (sx if spouse else (coh_x if cohabitants else cx))) / 2
             
-            # 식구 수가 많으면 넓은 가로폭(-1.25 ~ 1.25)을 사용해서 절대 안 겹치게함
             x_min = -1.25 if group_count >= 3 else -0.65
             x_max = 1.25 if group_count >= 3 else 0.65
 
@@ -459,7 +456,6 @@ else:
                             ax.plot([grx, grx], [chy - 0.2, gcy + 0.1], color='#2D3436', lw=1.2, zorder=1)
                             if gc.get('is_cohabit'): cohabit_coords.append((grx, gcy))
 
-            # 가계선 그리기
             real_ch_xs = [child_coords_map[k] for k in sorted(child_coords_map.keys())]
 
             if group_count == 1:
@@ -506,11 +502,10 @@ else:
                 draw_person(px, pet_y, pt['name'], pt['age'], pt['gender'], pt['is_alive'])
                 if pt.get('is_cohabit'): cohabit_coords.append((px, pet_y))
 
-        # 6. [핵심 구현] 자유 외곽선(Convex Hull & Curved Path) 동거 영역 그리기
+        # 6. [순수 Numpy 기반 외곽선] 동거인 영역 그리기 (외부 패키지 의존성 완전 제거)
         if len(cohabit_coords) > 0:
             pts = np.array(cohabit_coords)
             
-            # 동거인이 1명인 경우
             if len(pts) == 1:
                 px, py = pts[0]
                 co_bubble = patches.FancyBboxPatch(
@@ -520,78 +515,21 @@ else:
                 )
                 ax.add_patch(co_bubble)
                 ax.text(px - 0.16, py + 0.16, "🏠 동거 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'), color='#1B5E20', zorder=1)
-
-            # 동거인이 2명인 경우
-            elif len(pts) == 2:
-                min_x, max_x = min(pts[:, 0]) - 0.20, max(pts[:, 0]) + 0.20
-                min_y, max_y = min(pts[:, 1]) - 0.18, max(pts[:, 1]) + 0.18
+            else:
+                # 순수 Numpy 연산을 이용한 외곽 바운딩 박스/버블 생성
+                min_x, max_x = min(pts[:, 0]) - 0.22, max(pts[:, 0]) + 0.22
+                min_y, max_y = min(pts[:, 1]) - 0.20, max(pts[:, 1]) + 0.20
                 w, h = max_x - min_x, max_y - min_y
+                
                 co_bubble = patches.FancyBboxPatch(
                     (min_x, min_y), w, h,
                     boxstyle="round,pad=0.08,rounding_size=0.15",
                     facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
                 )
                 ax.add_patch(co_bubble)
-                ax.text(min_x + 0.02, max_y + 0.02, "🏠 동거 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'), color='#1B5E20', zorder=1)
+                ax.text(min_x + 0.02, max_y + 0.02, "🏠 동거 가족/동거인 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), color='#1B5E20', zorder=1)
 
-            # 동거인이 3명 이상인 경우: Convex Hull + 곡선 보정으로 비동거인 피해서 감싸기!
-            else:
-                try:
-                    hull = ConvexHull(pts)
-                    hull_pts = pts[hull.vertices]
-                    
-                    # 각 점에서 유연한 외곽 여백(Margin) 부여
-                    center = np.mean(pts, axis=0)
-                    expanded_pts = []
-                    for pt in hull_pts:
-                        vec = pt - center
-                        norm = np.linalg.norm(vec)
-                        vec_n = vec / norm if norm != 0 else vec
-                        expanded_pts.append(pt + vec_n * 0.22)
-                    
-                    expanded_pts = np.array(expanded_pts)
-                    
-                    # 곡선 외곽선 경로(Path) 생성
-                    verts = []
-                    codes = []
-                    n_hull = len(expanded_pts)
-                    for i in range(n_hull):
-                        p0 = expanded_pts[i]
-                        p1 = expanded_pts[(i + 1) % n_hull]
-                        
-                        if i == 0:
-                            verts.append(p0)
-                            codes.append(mpath.Path.MOVETO)
-                        
-                        # 3차 베지에 곡선 조종점 연산
-                        mid = (p0 + p1) / 2
-                        verts.append(mid)
-                        codes.append(mpath.Path.CURVE3)
-                        verts.append(p1)
-                        codes.append(mpath.Path.CURVE3)
-
-                    verts.append(expanded_pts[0])
-                    codes.append(mpath.Path.CLOSEPOLY)
-
-                    path = mpath.Path(verts, codes)
-                    patch = patches.PathPatch(path, facecolor='#E8F5E9', edgecolor='#2E7D32', linestyle='--', linewidth=1.8, alpha=0.35, zorder=0)
-                    ax.add_patch(patch)
-                    
-                    top_idx = np.argmax(expanded_pts[:, 1])
-                    ax.text(expanded_pts[top_idx][0] - 0.15, expanded_pts[top_idx][1] + 0.03, "🏠 동거 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'), color='#1B5E20', zorder=1)
-                except:
-                    # 완충(Fallback) 처리
-                    min_x, max_x = min(pts[:, 0]) - 0.20, max(pts[:, 0]) + 0.20
-                    min_y, max_y = min(pts[:, 1]) - 0.18, max(pts[:, 1]) + 0.18
-                    w, h = max_x - min_x, max_y - min_y
-                    co_bubble = patches.FancyBboxPatch(
-                        (min_x, min_y), w, h,
-                        boxstyle="round,pad=0.08,rounding_size=0.15",
-                        facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
-                    )
-                    ax.add_patch(co_bubble)
-
-        ax.text(0, -1.38, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'), ha='center', va='center', color='#636E72')
+        ax.text(0, -1.38, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#636E72')
         
         ax.set_xlim(-1.60, 1.60)
         ax.set_ylim(-1.45, 1.45)
