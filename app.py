@@ -14,7 +14,7 @@ def load_korean_font():
     font_path = "NanumGothic.ttf"
     if not os.path.exists(font_path):
         url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
-        urllib.request.urllibretrieve(url, font_path)
+        urllib.request.urlretrieve(url, font_path)
     fm.fontManager.addfont(font_path)
     return fm.FontProperties(fname=font_path).get_name()
 
@@ -143,28 +143,36 @@ if selected_tool == "🌳 사례관리 생태도":
         ax.scatter(0, 0, s=1800, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.0, zorder=2)
         ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=9.5, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3)
 
-        # 체계 노드 상자 (폰트 크기 7.5pt, 패딩 pad=0.3으로 콤팩트하게 축소)
+        # 체계 노드 상자 (폰트: 6.8pt, pad=0.22로 더욱 슬림하게 축소)
         def draw_node_box(n_list, bg_color, border_color):
             for n in n_list:
                 x, y = pos[n['name']]
                 full_text = f"{n['name']}\n({n['role']})" if n.get('role') else f"{n['name']}"
-                bbox_props = dict(boxstyle="round,pad=0.3", fc=bg_color, ec=border_color, lw=1.3)
-                ax.text(x, y, full_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3, bbox=bbox_props, linespacing=1.2)
+                bbox_props = dict(boxstyle="round,pad=0.22", fc=bg_color, ec=border_color, lw=1.2)
+                ax.text(x, y, full_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3, bbox=bbox_props, linespacing=1.2)
 
         draw_node_box(official, "#E3F2FD", "#90CAF9")
         draw_node_box(unofficial, "#E8F5E9", "#A5D6A7")
 
-        # 화살표 연결 (축소된 노드 크기에 딱 맞게 shrink 조정)
+        # 슬림해진 상자 크기에 딱 맞춘 화살표 오프셋 보정 (상자쪽: 22pt, 원쪽: 22pt)
         for n in nodes:
             target_x, target_y = pos[n['name']]
-            lw = 2.4 if "강" in n['strength'] else (1.0 if "약" in n['strength'] else 1.5)
+            lw = 2.2 if "강" in n['strength'] else (1.0 if "약" in n['strength'] else 1.4)
             style = 'dashed' if "약" in n['strength'] else 'solid'
             color = '#000000' if "강" in n['strength'] else ('#636E72' if "약" in n['strength'] else '#2D3436')
 
-            if "체계 ➔ 대상자" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "->", 20, 22
-            elif "대상자 ➔ 체계" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (0, 0), (target_x, target_y), "->", 22, 20
-            elif "쌍방향" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "<->", 20, 22
-            else: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "-", 20, 22
+            if "체계 ➔ 대상자" in n['direction']: 
+                start_pt, end_pt, arr_style = (target_x, target_y), (0, 0), "->"
+                sA, sB = 22, 22
+            elif "대상자 ➔ 체계" in n['direction']: 
+                start_pt, end_pt, arr_style = (0, 0), (target_x, target_y), "->"
+                sA, sB = 22, 22
+            elif "쌍방향" in n['direction']: 
+                start_pt, end_pt, arr_style = (target_x, target_y), (0, 0), "<->"
+                sA, sB = 22, 22
+            else: 
+                start_pt, end_pt, arr_style = (target_x, target_y), (0, 0), "-"
+                sA, sB = 22, 22
 
             arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=sA, shrinkB=sB)
             ax.annotate("", xy=end_pt, xytext=start_pt, arrowprops=arrow, zorder=4)
@@ -230,7 +238,7 @@ else:
         children = [m for m in members if "자녀" in m['relation']]
 
         def draw_person(x, y, name, age, gender, is_alive, is_target=False):
-            box_s = 0.24  # 기호 사이즈 슬림화
+            box_s = 0.22
             color = '#FFEAA7' if is_target else ('#E3F2FD' if gender == '남성' else '#FCE4EC')
             edge_c = '#FDCB6E' if is_target else ('#1976D2' if gender == '남성' else '#C2185B')
             lw = 2.2 if is_target else 1.6
@@ -259,9 +267,9 @@ else:
             draw_person(sx, sy, sp['name'], sp['age'], sp['gender'], sp['is_alive'])
             line_style = '-' if sp['rel_type'] != '소원/불화' else '--'
             color = '#D63031' if sp['rel_type'] == '소원/불화' else '#2D3436'
-            ax.plot([cx + 0.12, sx - 0.12], [cy, sy], color=color, linestyle=line_style, lw=2, zorder=2)
+            ax.plot([cx + 0.11, sx - 0.11], [cy, sy], color=color, linestyle=line_style, lw=2, zorder=2)
             if sp['rel_type'] == '밀접/친밀':
-                ax.plot([cx + 0.12, sx - 0.12], [cy + 0.03, sy + 0.03], color='#1976D2', lw=2, zorder=2)
+                ax.plot([cx + 0.11, sx - 0.11], [cy + 0.03, sy + 0.03], color='#1976D2', lw=2, zorder=2)
 
         if parents:
             py = 0.9
@@ -274,11 +282,11 @@ else:
             if mother: draw_person(p_mx, py, mother[0]['name'], mother[0]['age'], mother[0]['gender'], mother[0]['is_alive'])
 
             if father and mother:
-                ax.plot([p_fx + 0.12, p_mx - 0.12], [py, py], color='#B2BEC3', linestyle='--', lw=1.5, zorder=1)
+                ax.plot([p_fx + 0.11, p_mx - 0.11], [py, py], color='#B2BEC3', linestyle='--', lw=1.5, zorder=1)
                 ax.plot([0, 0], [py, py - 0.3], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
-                ax.plot([0, cx], [py - 0.3, cy + 0.12], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
-            elif father: ax.plot([p_fx, cx], [py - 0.12, cy + 0.12], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
-            elif mother: ax.plot([p_mx, cx], [py - 0.12, cy + 0.12], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
+                ax.plot([0, cx], [py - 0.3, cy + 0.11], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
+            elif father: ax.plot([p_fx, cx], [py - 0.11, cy + 0.11], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
+            elif mother: ax.plot([p_mx, cx], [py - 0.11, cy + 0.11], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
 
         if children:
             chy = -0.85
@@ -293,7 +301,7 @@ else:
             for idx, ch in enumerate(children):
                 chx = ch_xs[idx]
                 draw_person(chx, chy, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
-                ax.plot([chx, chx], [branch_y, chy + 0.12], color='#2D3436', lw=1.5, zorder=1)
+                ax.plot([chx, chx], [branch_y, chy + 0.11], color='#2D3436', lw=1.5, zorder=1)
 
         ax.text(0, -1.3, "□ 남성   ○ 여성   [색상/굵은선] 당사자   [X] 사망   ═ 밀접   --- 불화", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#636E72')
         
