@@ -140,54 +140,53 @@ if selected_tool == "🌳 사례관리 생태도":
         ax.text(-0.52, circle_r, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10.5, weight='bold'), ha='center', va='center', color='#0D47A1', zorder=2, bbox=bbox_official)
         ax.text(0.52, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10.5, weight='bold'), ha='center', va='center', color='#1B5E20', zorder=2, bbox=bbox_unofficial)
 
-        # 중앙 원 (반지름 r=0.14)
+        # 중앙 원
         center_r = 0.14
         ax.scatter(0, 0, s=1800, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.0, zorder=2)
         ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=9.5, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3)
 
-        # 노드 박스 치수 직접 고정 (너비 w=0.36, 높이 h=0.18 로 슬림화)
-        box_w, box_h = 0.36, 0.18
+        # 노드 박스 치수 (가로 w=0.36, 세로 h=0.12 로 대폭 납작하게 만듦)
+        box_w, box_h = 0.36, 0.12
 
         def draw_node_box(n_list, bg_color, border_color):
             for n in n_list:
                 x, y = pos[n['name']]
                 
-                # 고정 크기 둥근 패치 직접 생성
+                # 가로로 길고 세로로 슬림한 패치
                 rect = patches.FancyBboxPatch(
                     (x - box_w/2, y - box_h/2), box_w, box_h,
-                    boxstyle="round,pad=0.02,rounding_size=0.03",
-                    facecolor=bg_color, edgecolor=border_color, linewidth=1.3, zorder=3
+                    boxstyle="round,pad=0.015,rounding_size=0.025",
+                    facecolor=bg_color, edgecolor=border_color, linewidth=1.2, zorder=3
                 )
                 ax.add_patch(rect)
 
-                # 텍스트 정밀 안착 (체계명: 7.5pt, 역할: 5.2pt)
+                # 납작해진 상자에 딱 맞는 텍스트 높이 정렬
                 if n.get('role'):
-                    ax.text(x, y + 0.03, n['name'], fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'),
+                    ax.text(x, y + 0.02, n['name'], fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.2, weight='bold'),
                             ha='center', va='center', color='#2D3436', zorder=4)
-                    ax.text(x, y - 0.03, f"({n['role']})", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=5.2),
+                    ax.text(x, y - 0.022, f"({n['role']})", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=5.2),
                             ha='center', va='center', color='#636E72', zorder=4)
                 else:
-                    ax.text(x, y, n['name'], fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'),
+                    ax.text(x, y, n['name'], fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.2, weight='bold'),
                             ha='center', va='center', color='#2D3436', zorder=4)
 
         draw_node_box(official, "#E3F2FD", "#90CAF9")
         draw_node_box(unofficial, "#E8F5E9", "#A5D6A7")
 
-        # 화살표 접점 계산 (박스 외곽선 & 중앙 원 외곽선 교차점에 딱 맞춤)
+        # 화살표 접점 정밀 계산
         for n in nodes:
             x, y = pos[n['name']]
             lw = 2.2 if "강" in n['strength'] else (1.0 if "약" in n['strength'] else 1.4)
             style = 'dashed' if "약" in n['strength'] else 'solid'
             color = '#000000' if "강" in n['strength'] else ('#636E72' if "약" in n['strength'] else '#2D3436')
 
-            # 각도 기반 정밀 교차 좌표 계산
             angle = np.arctan2(y, x)
             
             # 중앙 원 경계점
             cx_edge = center_r * np.cos(angle)
             cy_edge = center_r * np.sin(angle)
 
-            # 박스 경계점 (수평/수직 내접)
+            # 슬림해진 직사각형 박스 경계 교차점 계산
             cos_a, sin_a = np.cos(angle), np.sin(angle)
             scale_x = (box_w/2) / abs(cos_a) if abs(cos_a) > 1e-5 else 999
             scale_y = (box_h/2) / abs(sin_a) if abs(sin_a) > 1e-5 else 999
@@ -205,7 +204,6 @@ if selected_tool == "🌳 사례관리 생태도":
             else:
                 p_start, p_end, arr_style = (bx_edge, by_edge), (cx_edge, cy_edge), "-"
 
-            # shrink=0 으로 정확한 좌표 접점 생성
             arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=0, shrinkB=0)
             ax.annotate("", xy=p_end, xytext=p_start, arrowprops=arrow, zorder=5)
 
