@@ -88,7 +88,7 @@ for i, node in enumerate(st.session_state.nodes):
         st.session_state.nodes.pop(i)
         st.rerun()
 
-# 위치 계산 함수 (원 반지름을 콤팩트하게 축소)
+# 위치 계산 함수 (원 반지름 및 노드 위치)
 def calculate_positions(node_list, is_official):
     positions = {}
     count = len(node_list)
@@ -100,7 +100,6 @@ def calculate_positions(node_list, is_official):
     else:
         start_angle, end_angle = -np.pi * 0.38, np.pi * 0.38
 
-    # 원 반지름을 0.85 ~ 1.05 수준으로 축소하여 중앙 밀집도 극대화
     if count <= 4:
         radii = [0.95] * count
         angles = np.linspace(start_angle, end_angle, count + 2)[1:-1] if count > 1 else [(start_angle + end_angle)/2]
@@ -137,7 +136,7 @@ def draw_pretty_ecomap(nodes, client_name):
     pos.update(calculate_positions(official, is_official=True))
     pos.update(calculate_positions(unofficial, is_official=False))
 
-    # 1. 축소된 외곽 원 (반지름 1.25)
+    # 1. 외곽 원 (반지름 1.25)
     circle_r = 1.25
     bg_circle = plt.Circle((0, 0), circle_r, color='#B2BEC3', fill=False, linestyle='-', linewidth=1.2)
     ax.add_patch(bg_circle)
@@ -145,39 +144,38 @@ def draw_pretty_ecomap(nodes, client_name):
     # 2. 중앙 세로 수직 점선
     ax.plot([0, 0], [-circle_r, circle_r], color='#B2BEC3', linestyle='--', linewidth=1.5, zorder=1)
 
-    # 3. 원 상단 아웃라인에 바짝 붙인 상단 라벨 텍스트
-    ax.text(-0.55, circle_r - 0.08, "공식체계\n(인공체계)", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10, weight='bold'),
-            ha='center', va='top', color='#2D3436')
-    ax.text(0.55, circle_r - 0.08, "비공식체계\n(자연체계)", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10, weight='bold'),
-            ha='center', va='top', color='#2D3436')
+    # 3. 상단 타이틀 (크기 13pt로 확대, 굵은 글씨, 괄호 제거)
+    ax.text(-0.55, circle_r - 0.08, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=13, weight='bold'),
+            ha='center', va='top', color='#000000')
+    ax.text(0.55, circle_r - 0.08, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=13, weight='bold'),
+            ha='center', va='top', color='#000000')
 
-    # 4. 중앙 대상자 노드 (글자 크기 확대: 14pt)
+    # 4. 중앙 대상자 노드
     ax.scatter(0, 0, s=3600, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.5, zorder=3)
     ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=14, weight='bold'),
             ha='center', va='center', color='#2D3436', zorder=4)
 
-    # 5. 체계 노드 그리기 (이름은 크게 11pt, 역할은 작게 7.5pt)
+    # 5. 체계 노드 그리기 (박스 여백 pad=0.7로 대폭 확대하여 역할 설명 포함 완벽 감싸기)
     def draw_node_box(n_list, bg_color, border_color):
         for n in n_list:
             x, y = pos[n['name']]
             
-            # 박스 배경
-            bbox_props = dict(boxstyle="round,pad=0.5", fc=bg_color, ec=border_color, lw=1.8)
-            
+            # 박스 내부 텍스트 구성 (이름 + 역할)
             if n.get('role'):
-                # 텍스트 2줄 구성 (이름 크게, 역할 작게)
-                ax.text(x, y + 0.025, f"{n['name']}", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=11, weight='bold'),
-                        ha='center', va='center', color='#2D3436', zorder=5, bbox=bbox_props)
-                ax.text(x, y - 0.035, f"({n['role']})", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5),
-                        ha='center', va='center', color='#636E72', zorder=6)
+                full_text = f"{n['name']}\n({n['role']})"
             else:
-                ax.text(x, y, f"{n['name']}", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=11, weight='bold'),
-                        ha='center', va='center', color='#2D3436', zorder=5, bbox=bbox_props)
+                full_text = f"{n['name']}"
+
+            # pad=0.75 로 여백을 넉넉히 주어 노드 상자가 글자를 깔끔하게 완벽 감싸도록 조정
+            bbox_props = dict(boxstyle="round,pad=0.75", fc=bg_color, ec=border_color, lw=1.8)
+            
+            ax.text(x, y, full_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10, weight='bold'),
+                    ha='center', va='center', color='#2D3436', zorder=5, bbox=bbox_props, linespacing=1.3)
 
     draw_node_box(official, "#E3F2FD", "#90CAF9")
     draw_node_box(unofficial, "#E8F5E9", "#A5D6A7")
 
-    # 6. 선 형태 및 화살표 연결
+    # 6. 선 형태 및 화살표 연결 (확대된 상자 크기에 맞게 shrink 조정)
     for n in nodes:
         target_x, target_y = pos[n['name']]
         
@@ -211,12 +209,12 @@ def draw_pretty_ecomap(nodes, client_name):
             end_pt = (0, 0)
             arr_style = "-"
 
-        arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=22, shrinkB=22)
+        arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=28, shrinkB=28)
         ax.annotate("", xy=end_pt, xytext=start_pt, arrowprops=arrow, zorder=2)
 
     # 하단 범례 표시
     legend_text = "↔ 쌍방향·강함     ➔ 일방향·보통     ---> 점선·약함"
-    ax.text(0, -1.45, legend_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=9, weight='bold'),
+    ax.text(0, -1.45, legend_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=9.5, weight='bold'),
             ha='center', va='center', color='#2D3436')
 
     ax.set_xlim(-1.5, 1.5)
@@ -234,12 +232,11 @@ with col1:
 
 with col2:
     st.markdown("### 📌 생태도 작성 안내")
-    st.info("**공식체계:** 제도 안의 관계 (역할 함께 표시)")
-    st.success("**비공식체계:** 제도 밖의 관계 (역할 함께 표시)")
+    st.info("**공식체계:** 제도 안의 서비스/기관")
+    st.success("**비공식체계:** 제도 밖의 개인/자원")
     st.markdown("---")
     st.markdown("""
     **개선 사항:**
-    - 원 직경이 줄어들어 밀도감이 크게 개선되었습니다.
-    - 체계명은 굵고 크게, 역할은 작고 얇게 위계가 정리되었습니다.
-    - 상단 라벨이 원 테두리선에 밀착되었습니다.
+    - 상단 '공식체계', '비공식체계' 타이틀이 더 크고 또렷해졌습니다.
+    - 네모 박스가 충분히 넓어져 역할 설명이 완전히 박스 안으로 들어왔습니다.
     """)
