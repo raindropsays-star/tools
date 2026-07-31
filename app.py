@@ -2,10 +2,12 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import matplotlib.patches as patches
+import matplotlib.path as mpath
 import numpy as np
 import urllib.request
 import os
 import io
+from scipy.spatial import ConvexHull
 
 # 1. 한글 폰트(나눔고딕) 자동 다운로드 및 적용
 @st.cache_resource
@@ -50,13 +52,14 @@ if "gen_client" not in st.session_state:
 
 if "family_members" not in st.session_state:
     st.session_state.family_members = [
-        {"relation": "부(아버지)", "name": "아버지", "gender": "남성", "age": "사망", "is_alive": False, "rel_type": "보통", "is_cohabit": False},
-        {"relation": "모(어머니)", "name": "어머니", "gender": "여성", "age": "사망", "is_alive": False, "rel_type": "보통", "is_cohabit": False},
-        {"relation": "배우자", "name": "배우자", "gender": "여성", "age": "68", "is_alive": True, "rel_type": "밀접/친밀", "is_cohabit": True},
-        {"relation": "자녀", "name": "장남", "gender": "남성", "age": "45", "is_alive": True, "rel_type": "보통", "is_cohabit": True},
-        {"relation": "사위/며느리", "name": "큰며느리", "gender": "여성", "age": "43", "is_alive": True, "rel_type": "보통", "is_cohabit": True},
-        {"relation": "자녀", "name": "차남", "gender": "남성", "age": "44", "is_alive": True, "rel_type": "보통", "is_cohabit": True},
-        {"relation": "사위/며느리", "name": "둘째며느리", "gender": "여성", "age": "41", "is_alive": True, "rel_type": "보통", "is_cohabit": True}
+        {"relation": "배우자", "name": "배우자", "gender": "여성", "age": "68", "is_alive": True, "rel_type": "밀접/친밀", "is_cohabit": False},
+        {"relation": "자녀", "name": "장남", "gender": "남성", "age": "45", "is_alive": True, "rel_type": "보통", "is_cohabit": False},
+        {"relation": "사위/며느리", "name": "큰며느리", "gender": "여성", "age": "43", "is_alive": True, "rel_type": "보통", "is_cohabit": False},
+        {"relation": "자녀", "name": "차남", "gender": "남성", "age": "44", "is_alive": True, "rel_type": "보통", "is_cohabit": False},
+        {"relation": "사위/며느리", "name": "둘째며느리", "gender": "여성", "age": "41", "is_alive": True, "rel_type": "보통", "is_cohabit": False},
+        {"relation": "자녀", "name": "장녀", "gender": "여성", "age": "42", "is_alive": True, "rel_type": "보통", "is_cohabit": False},
+        {"relation": "사위/며느리", "name": "큰사위", "gender": "남성", "age": "45", "is_alive": True, "rel_type": "보통", "is_cohabit": False},
+        {"relation": "자녀", "name": "막내딸", "gender": "여성", "age": "38", "is_alive": True, "rel_type": "보통", "is_cohabit": True}
     ]
 
 # -------------------------------------------------------------
@@ -225,7 +228,7 @@ if selected_tool == "🌳 사례관리 생태도":
     st.download_button(label="💾 생태도 고화질 이미지 다운로드 (PNG)", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png")
 
 # =============================================================
-# [MODE 2] 가계도 모드 (사위/며느리 N명 1:1 매칭 및 균등 간격 알고리즘)
+# [MODE 2] 가계도 모드 (Convex Hull 자유 곡선 동거 영역 및 가변 배치 적용)
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
@@ -242,11 +245,11 @@ else:
     with st.sidebar.form("add_family_form"):
         st.subheader("➕ 가족/동거인 추가")
         f_rel = st.selectbox("관계 구분", ["배우자", "자녀", "동거인", "사위/며느리", "손자/손녀", "부(아버지)", "모(어머니)", "반려동물"])
-        f_name = st.text_input("이름/호칭 (예: 장남, 큰며느리, 둘째며느리 등)")
+        f_name = st.text_input("이름/호칭 (예: 장남, 큰며느리, 차남 등)")
         f_gender = st.radio("성별", ["남성", "여성", "기타(반려동물)"], horizontal=True, key="fam_gender")
         f_age = st.text_input("나이 (사망 시 '사망' 입력)")
         f_rel_type = st.selectbox("당사자/가족과의 관계 상태", ["동거/혼인", "사실혼", "동거인", "별거", "이혼", "불화/갈등", "소원", "단절", "보통", "밀접/친밀"])
-        f_cohabit = st.checkbox("🏠 현재 당사자와 동거 중", value=True)
+        f_cohabit = st.checkbox("🏠 현재 당사자와 동거 중", value=False)
         
         if st.form_submit_button("가족/동거인 추가하기") and f_name:
             is_alive = False if f_age == "사망" else True
@@ -266,7 +269,7 @@ else:
             st.rerun()
 
     def draw_pretty_genogram(client, members):
-        fig, ax = plt.subplots(figsize=(5.5, 5.5), dpi=200)
+        fig, ax = plt.subplots(figsize=(6.0, 6.0), dpi=200)
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
@@ -281,7 +284,7 @@ else:
         cohabit_coords = []
 
         def draw_person(x, y, name, age, gender, is_alive, is_target=False):
-            box_s = 0.20
+            box_s = 0.18
             color = '#FFEAA7' if is_target else ('#E3F2FD' if gender == '남성' else ('#FCE4EC' if gender == '여성' else '#E8F5E9'))
             edge_c = '#FDCB6E' if is_target else ('#1976D2' if gender == '남성' else ('#C2185B' if gender == '여성' else '#388E3C'))
             lw = 2.2 if is_target else 1.5
@@ -301,16 +304,16 @@ else:
                 ax.plot([x - box_s/2.2, x + box_s/2.2], [y + box_s/2.2, y - box_s/2.2], color='#D63031', lw=1.8, zorder=5)
 
             disp_txt = f"{name}\n({age}세)" if is_alive else f"{name}\n(사망)"
-            ax.text(x, y - box_s/2 - 0.07, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'),
+            ax.text(x, y - box_s/2 - 0.07, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                     ha='center', va='top', color='#2D3436', zorder=5)
 
         # 1. 당사자 및 배우자
-        cx, cy = (0, 0.22) if (not spouse and not cohabitants) else (-0.45, 0.22)
+        cx, cy = (0, 0.25) if (not spouse and not cohabitants) else (-0.45, 0.25)
         draw_person(cx, cy, client['name'], client['age'], client['gender'], client['is_alive'], is_target=True)
         if client.get('is_cohabit', True): cohabit_coords.append((cx, cy))
 
         if spouse:
-            sx, sy = (0.45, 0.22)
+            sx, sy = (0.45, 0.25)
             sp = spouse[0]
             draw_person(sx, sy, sp['name'], sp['age'], sp['gender'], sp['is_alive'])
             if sp.get('is_cohabit', False): cohabit_coords.append((sx, sy))
@@ -321,53 +324,53 @@ else:
 
             if rel == '사실혼':
                 ax.plot([cx + 0.1, sx - 0.1], [cy, sy], color='#2D3436', linestyle='--', lw=1.5, zorder=2)
-                ax.text(mid_x, cy + 0.08, "사실혼", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'),
+                ax.text(mid_x, cy + 0.08, "사실혼", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                         ha='center', va='center', color='#27AE60', zorder=4, bbox=lbl_bbox)
             elif rel == '이혼':
                 ax.plot([cx + 0.1, sx - 0.1], [cy, sy], color='#2D3436', lw=1.5, zorder=2)
                 ax.plot([mid_x - 0.04, mid_x - 0.01], [cy - 0.05, cy + 0.05], color='#D63031', lw=1.8, zorder=3)
                 ax.plot([mid_x + 0.01, mid_x + 0.04], [cy - 0.05, cy + 0.05], color='#D63031', lw=1.8, zorder=3)
-                ax.text(mid_x, cy + 0.08, "이혼", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'),
+                ax.text(mid_x, cy + 0.08, "이혼", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                         ha='center', va='center', color='#D63031', zorder=4, bbox=lbl_bbox)
             elif rel == '별거':
                 ax.plot([cx + 0.1, sx - 0.1], [cy, sy], color='#2D3436', lw=1.5, zorder=2)
                 ax.plot([mid_x, mid_x + 0.03], [cy - 0.05, cy + 0.05], color='#E67E22', lw=1.8, zorder=3)
-                ax.text(mid_x, cy + 0.08, "별거", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'),
+                ax.text(mid_x, cy + 0.08, "별거", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                         ha='center', va='center', color='#E67E22', zorder=4, bbox=lbl_bbox)
             elif rel == '불화/갈등':
                 xs = np.linspace(cx + 0.1, sx - 0.1, 20)
                 ys = cy + 0.02 * np.sin(xs * 30)
                 ax.plot(xs, ys, color='#D63031', lw=1.8, zorder=2)
-                ax.text(mid_x, cy + 0.08, "불화", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'),
+                ax.text(mid_x, cy + 0.08, "불화", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                         ha='center', va='center', color='#D63031', zorder=4, bbox=lbl_bbox)
             elif rel == '소원':
                 ax.plot([cx + 0.1, sx - 0.1], [cy, sy], color='#7F8C8D', linestyle='--', lw=1.5, zorder=2)
-                ax.text(mid_x, cy + 0.08, "소원", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'),
+                ax.text(mid_x, cy + 0.08, "소원", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                         ha='center', va='center', color='#7F8C8D', zorder=4, bbox=lbl_bbox)
             elif rel == '단절':
                 ax.plot([cx + 0.1, sx - 0.1], [cy, sy], color='#2D3436', lw=1.5, zorder=2)
                 ax.plot([mid_x - 0.03, mid_x + 0.03], [cy - 0.04, cy + 0.04], color='#2D3436', lw=2.0, zorder=3)
                 ax.plot([mid_x - 0.03, mid_x + 0.03], [cy + 0.04, cy - 0.04], color='#2D3436', lw=2.0, zorder=3)
-                ax.text(mid_x, cy + 0.08, "단절", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'),
+                ax.text(mid_x, cy + 0.08, "단절", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                         ha='center', va='center', color='#2D3436', zorder=4, bbox=lbl_bbox)
             elif rel == '밀접/친밀':
                 ax.plot([cx + 0.1, sx - 0.1], [cy + 0.015, sy + 0.015], color='#1976D2', lw=1.8, zorder=2)
                 ax.plot([cx + 0.1, sx - 0.1], [cy - 0.015, sy - 0.015], color='#1976D2', lw=1.8, zorder=2)
-                ax.text(mid_x, cy + 0.08, "친밀", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'),
+                ax.text(mid_x, cy + 0.08, "친밀", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                         ha='center', va='center', color='#1976D2', zorder=4, bbox=lbl_bbox)
             else:
                 ax.plot([cx + 0.1, sx - 0.1], [cy, sy], color='#2D3436', lw=1.5, zorder=2)
 
         if cohabitants and not spouse:
             coh = cohabitants[0]
-            coh_x, coh_y = (0.45, 0.22)
+            coh_x, coh_y = (0.45, 0.25)
             draw_person(coh_x, coh_y, coh['name'], coh['age'], coh['gender'], coh['is_alive'])
             if coh.get('is_cohabit', True): cohabit_coords.append((coh_x, coh_y))
 
             mid_x = (cx + coh_x) / 2
             lbl_bbox = dict(boxstyle="round,pad=0.2", fc="#FFFFFF", ec="none", alpha=0.85)
             ax.plot([cx + 0.1, coh_x - 0.1], [cy, coh_y], color='#2E7D32', linestyle=':', lw=1.5, zorder=2)
-            ax.text(mid_x, cy + 0.08, "동거인", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'),
+            ax.text(mid_x, cy + 0.08, "동거인", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                     ha='center', va='center', color='#2E7D32', zorder=4, bbox=lbl_bbox)
 
         # 2. 부모님 (1세대)
@@ -391,12 +394,11 @@ else:
                 ax.plot([0, cx], [p_mid_y, p_mid_y], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
                 ax.plot([cx, cx], [p_mid_y, cy + 0.1], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
 
-        # 3. 자녀 세대 정밀 그룹 및 사위/며느리 1:1 매칭 동적 배치
+        # 3. 자녀 세대 가변 폭 배치 (식구 수 비례 넓은 X축 동적 확보)
         if children:
             chy = -0.38
-            branch_y = -0.08
+            branch_y = -0.05
             
-            # 자녀별 그룹 형성 (순서대로 사위/며느리 1:1 바인딩)
             family_groups = []
             for ch_idx, ch in enumerate(children):
                 il = in_laws[ch_idx] if ch_idx < len(in_laws) else None
@@ -408,11 +410,14 @@ else:
             group_count = len(family_groups)
             parent_mid_x = (cx + (sx if spouse else (coh_x if cohabitants else cx))) / 2
             
-            # 그룹별 가로 X 중심점 계산
+            # 식구 수가 많으면 넓은 가로폭(-1.25 ~ 1.25)을 사용해서 절대 안 겹치게함
+            x_min = -1.25 if group_count >= 3 else -0.65
+            x_max = 1.25 if group_count >= 3 else 0.65
+
             if group_count == 1:
                 group_xs = [parent_mid_x]
             else:
-                group_xs = list(np.linspace(-0.65, 0.65, group_count))
+                group_xs = list(np.linspace(x_min, x_max, group_count))
 
             child_coords_map = {}
 
@@ -432,7 +437,7 @@ else:
                     draw_person(ch_x, chy, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
                     draw_person(il_x, chy, il['name'], il['age'], il['gender'], il['is_alive'])
                     
-                    ax.plot([ch_x + 0.1, il_x - 0.1], [chy, chy], color='#2D3436', lw=1.2, zorder=2)
+                    ax.plot([ch_x + 0.09, il_x - 0.09], [chy, chy], color='#2D3436', lw=1.2, zorder=2)
                     
                     child_coords_map[group['child_idx']] = ch_x
                     if ch.get('is_cohabit'): cohabit_coords.append((ch_x, chy))
@@ -454,7 +459,7 @@ else:
                             ax.plot([grx, grx], [chy - 0.2, gcy + 0.1], color='#2D3436', lw=1.2, zorder=1)
                             if gc.get('is_cohabit'): cohabit_coords.append((grx, gcy))
 
-            # 자녀 세대 연결선 출력 (수직 직하강 또는 T자선)
+            # 가계선 그리기
             real_ch_xs = [child_coords_map[k] for k in sorted(child_coords_map.keys())]
 
             if group_count == 1:
@@ -495,35 +500,100 @@ else:
         # 5. 반려동물
         if pets:
             pet_y = -0.38 if not children else -0.92
-            pet_x = 0.85
+            pet_x = 1.10
             for p_idx, pt in enumerate(pets):
                 px = pet_x - (p_idx * 0.28)
                 draw_person(px, pet_y, pt['name'], pt['age'], pt['gender'], pt['is_alive'])
                 if pt.get('is_cohabit'): cohabit_coords.append((px, pet_y))
 
-        # 6. 동거인 영역
+        # 6. [핵심 구현] 자유 외곽선(Convex Hull & Curved Path) 동거 영역 그리기
         if len(cohabit_coords) > 0:
-            xs = [c[0] for c in cohabit_coords]
-            ys = [c[1] for c in cohabit_coords]
-            min_x, max_x = min(xs) - 0.22, max(xs) + 0.22
-            min_y, max_y = min(ys) - 0.22, max(ys) + 0.22
+            pts = np.array(cohabit_coords)
             
-            width = max_x - min_x
-            height = max_y - min_y
-            center_x = (min_x + max_x) / 2
-            center_y = (min_y + max_y) / 2
+            # 동거인이 1명인 경우
+            if len(pts) == 1:
+                px, py = pts[0]
+                co_bubble = patches.FancyBboxPatch(
+                    (px - 0.18, py - 0.18), 0.36, 0.36,
+                    boxstyle="round,pad=0.08,rounding_size=0.15",
+                    facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
+                )
+                ax.add_patch(co_bubble)
+                ax.text(px - 0.16, py + 0.16, "🏠 동거 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'), color='#1B5E20', zorder=1)
 
-            co_bubble = patches.FancyBboxPatch(
-                (center_x - width/2, center_y - height/2), width, height,
-                boxstyle="round,pad=0.08,rounding_size=0.15",
-                facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
-            )
-            ax.add_patch(co_bubble)
-            ax.text(min_x + 0.02, max_y + 0.02, "🏠 동거 가족/동거인 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), color='#1B5E20', zorder=1)
+            # 동거인이 2명인 경우
+            elif len(pts) == 2:
+                min_x, max_x = min(pts[:, 0]) - 0.20, max(pts[:, 0]) + 0.20
+                min_y, max_y = min(pts[:, 1]) - 0.18, max(pts[:, 1]) + 0.18
+                w, h = max_x - min_x, max_y - min_y
+                co_bubble = patches.FancyBboxPatch(
+                    (min_x, min_y), w, h,
+                    boxstyle="round,pad=0.08,rounding_size=0.15",
+                    facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
+                )
+                ax.add_patch(co_bubble)
+                ax.text(min_x + 0.02, max_y + 0.02, "🏠 동거 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'), color='#1B5E20', zorder=1)
 
-        ax.text(0, -1.35, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#636E72')
+            # 동거인이 3명 이상인 경우: Convex Hull + 곡선 보정으로 비동거인 피해서 감싸기!
+            else:
+                try:
+                    hull = ConvexHull(pts)
+                    hull_pts = pts[hull.vertices]
+                    
+                    # 각 점에서 유연한 외곽 여백(Margin) 부여
+                    center = np.mean(pts, axis=0)
+                    expanded_pts = []
+                    for pt in hull_pts:
+                        vec = pt - center
+                        norm = np.linalg.norm(vec)
+                        vec_n = vec / norm if norm != 0 else vec
+                        expanded_pts.append(pt + vec_n * 0.22)
+                    
+                    expanded_pts = np.array(expanded_pts)
+                    
+                    # 곡선 외곽선 경로(Path) 생성
+                    verts = []
+                    codes = []
+                    n_hull = len(expanded_pts)
+                    for i in range(n_hull):
+                        p0 = expanded_pts[i]
+                        p1 = expanded_pts[(i + 1) % n_hull]
+                        
+                        if i == 0:
+                            verts.append(p0)
+                            codes.append(mpath.Path.MOVETO)
+                        
+                        # 3차 베지에 곡선 조종점 연산
+                        mid = (p0 + p1) / 2
+                        verts.append(mid)
+                        codes.append(mpath.Path.CURVE3)
+                        verts.append(p1)
+                        codes.append(mpath.Path.CURVE3)
+
+                    verts.append(expanded_pts[0])
+                    codes.append(mpath.Path.CLOSEPOLY)
+
+                    path = mpath.Path(verts, codes)
+                    patch = patches.PathPatch(path, facecolor='#E8F5E9', edgecolor='#2E7D32', linestyle='--', linewidth=1.8, alpha=0.35, zorder=0)
+                    ax.add_patch(patch)
+                    
+                    top_idx = np.argmax(expanded_pts[:, 1])
+                    ax.text(expanded_pts[top_idx][0] - 0.15, expanded_pts[top_idx][1] + 0.03, "🏠 동거 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'), color='#1B5E20', zorder=1)
+                except:
+                    # 완충(Fallback) 처리
+                    min_x, max_x = min(pts[:, 0]) - 0.20, max(pts[:, 0]) + 0.20
+                    min_y, max_y = min(pts[:, 1]) - 0.18, max(pts[:, 1]) + 0.18
+                    w, h = max_x - min_x, max_y - min_y
+                    co_bubble = patches.FancyBboxPatch(
+                        (min_x, min_y), w, h,
+                        boxstyle="round,pad=0.08,rounding_size=0.15",
+                        facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
+                    )
+                    ax.add_patch(co_bubble)
+
+        ax.text(0, -1.38, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'), ha='center', va='center', color='#636E72')
         
-        ax.set_xlim(-1.45, 1.45)
+        ax.set_xlim(-1.60, 1.60)
         ax.set_ylim(-1.45, 1.45)
         plt.axis("off")
         plt.tight_layout()
