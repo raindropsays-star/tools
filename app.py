@@ -24,7 +24,8 @@ st.set_page_config(page_title="사회복지 사례관리 생태도 생성기", l
 
 st.markdown("""
 <style>
-    .main-title { font-size: 2rem; font-weight: bold; color: #2C3E50; margin-bottom: 1rem; }
+    .main-title { font-size: 1.6rem; font-weight: bold; color: #2C3E50; margin-bottom: 0.5rem; }
+    .block-container { padding-top: 2rem; padding-bottom: 1rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -88,7 +89,7 @@ for i, node in enumerate(st.session_state.nodes):
         st.session_state.nodes.pop(i)
         st.rerun()
 
-# 위치 계산 함수
+# 위치 계산 함수 (타이이트한 원 구도를 위해 배치 반지름 보정)
 def calculate_positions(node_list, is_official):
     positions = {}
     count = len(node_list)
@@ -101,11 +102,11 @@ def calculate_positions(node_list, is_official):
         start_angle, end_angle = -np.pi * 0.38, np.pi * 0.38
 
     if count <= 4:
-        radii = [0.95] * count
+        radii = [0.82] * count
         angles = np.linspace(start_angle, end_angle, count + 2)[1:-1] if count > 1 else [(start_angle + end_angle)/2]
     else:
         half = (count + 1) // 2
-        radii = [0.82] * half + [1.1] * (count - half)
+        radii = [0.72] * half + [0.95] * (count - half)
         angles_inner = np.linspace(start_angle, end_angle, half + 2)[1:-1]
         angles_outer = np.linspace(start_angle, end_angle, (count - half) + 2)[1:-1]
         angles = list(angles_inner) + list(angles_outer)
@@ -119,9 +120,9 @@ def calculate_positions(node_list, is_official):
 
     return positions
 
-# 생태도 시각화 함수
+# 생태도 시각화 함수 (외부 원을 타이트하게 축소)
 def draw_pretty_ecomap(nodes, client_name):
-    fig, ax = plt.subplots(figsize=(8.5, 8.5), dpi=200)
+    fig, ax = plt.subplots(figsize=(6.5, 6.5), dpi=200)
     fig.patch.set_facecolor('#FFFFFF')
     ax.set_facecolor('#FFFFFF')
 
@@ -136,26 +137,26 @@ def draw_pretty_ecomap(nodes, client_name):
     pos.update(calculate_positions(official, is_official=True))
     pos.update(calculate_positions(unofficial, is_official=False))
 
-    # 1. 외곽 원 (반지름 1.25)
-    circle_r = 1.25
+    # 1. 외곽 원 (반지름을 1.25 -> 1.08로 타이트하게 축소)
+    circle_r = 1.08
     bg_circle = plt.Circle((0, 0), circle_r, color='#B2BEC3', fill=False, linestyle='-', linewidth=1.2)
     ax.add_patch(bg_circle)
 
     # 2. 중앙 세로 수직 점선
     ax.plot([0, 0], [-circle_r, circle_r], color='#B2BEC3', linestyle='--', linewidth=1.5, zorder=1)
 
-    # 3. 상단 타이틀
-    bbox_official = dict(boxstyle="round,pad=0.5", fc="#E3F2FD", ec="#1E88E5", lw=2)
-    bbox_unofficial = dict(boxstyle="round,pad=0.5", fc="#E8F5E9", ec="#43A047", lw=2)
+    # 3. 상단 타이틀 (원 테두리에 바짝 밀착)
+    bbox_official = dict(boxstyle="round,pad=0.4", fc="#E3F2FD", ec="#1E88E5", lw=1.8)
+    bbox_unofficial = dict(boxstyle="round,pad=0.4", fc="#E8F5E9", ec="#43A047", lw=1.8)
 
-    ax.text(-0.55, circle_r, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=15, weight='bold'),
+    ax.text(-0.48, circle_r, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=12.5, weight='bold'),
             ha='center', va='center', color='#0D47A1', zorder=2, bbox=bbox_official)
-    ax.text(0.55, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=15, weight='bold'),
+    ax.text(0.48, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=12.5, weight='bold'),
             ha='center', va='center', color='#1B5E20', zorder=2, bbox=bbox_unofficial)
 
     # 4. 중앙 대상자 노드
-    ax.scatter(0, 0, s=3600, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.5, zorder=2)
-    ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=14, weight='bold'),
+    ax.scatter(0, 0, s=2800, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.2, zorder=2)
+    ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=12, weight='bold'),
             ha='center', va='center', color='#2D3436', zorder=3)
 
     # 5. 체계 노드 그리기
@@ -168,63 +169,62 @@ def draw_pretty_ecomap(nodes, client_name):
             else:
                 full_text = f"{n['name']}"
 
-            bbox_props = dict(boxstyle="round,pad=0.6", fc=bg_color, ec=border_color, lw=1.8)
+            bbox_props = dict(boxstyle="round,pad=0.5", fc=bg_color, ec=border_color, lw=1.5)
             
-            ax.text(x, y, full_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10, weight='bold'),
-                    ha='center', va='center', color='#2D3436', zorder=3, bbox=bbox_props, linespacing=1.3)
+            ax.text(x, y, full_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=9, weight='bold'),
+                    ha='center', va='center', color='#2D3436', zorder=3, bbox=bbox_props, linespacing=1.2)
 
     draw_node_box(official, "#E3F2FD", "#90CAF9")
     draw_node_box(unofficial, "#E8F5E9", "#A5D6A7")
 
-    # 6. 화살표 정밀 여백 조정 (방향별 오프셋 정밀 분기)
+    # 6. 화살표 연결 (타이트해진 구도에 맞춰 간격 세밀 조절)
     for n in nodes:
         target_x, target_y = pos[n['name']]
         
         if "강" in n['strength']:
-            lw = 3.0
+            lw = 2.6
             style = 'solid'
             color = '#000000'
         elif "약" in n['strength']:
-            lw = 1.2
+            lw = 1.1
             style = 'dashed'
             color = '#636E72'
         else:
-            lw = 1.8
+            lw = 1.6
             style = 'solid'
             color = '#2D3436'
 
-        # 방향별 출발점, 도착점 및 상자/원과의 여백 오프셋 지정
         if "체계 ➔ 대상자" in n['direction']:
             start_pt = (target_x, target_y)
             end_pt = (0, 0)
             arr_style = "->"
-            sA, sB = 48, 42  # 출발(체계 상자 여백): 48, 도착(중앙 원 여백): 42
+            sA, sB = 38, 35
         elif "대상자 ➔ 체계" in n['direction']:
             start_pt = (0, 0)
             end_pt = (target_x, target_y)
             arr_style = "->"
-            sA, sB = 42, 48  # 출발(중앙 원 여백): 42, 도착(체계 상자 여백): 48 -> 상자 침범 완벽 방지
+            sA, sB = 35, 38
         elif "쌍방향" in n['direction']:
             start_pt = (target_x, target_y)
             end_pt = (0, 0)
             arr_style = "<->"
-            sA, sB = 48, 42  # 체계 상자쪽 48, 중앙 원쪽 42
+            sA, sB = 38, 35
         else:
             start_pt = (target_x, target_y)
             end_pt = (0, 0)
             arr_style = "-"
-            sA, sB = 48, 42
+            sA, sB = 38, 35
 
         arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=sA, shrinkB=sB)
         ax.annotate("", xy=end_pt, xytext=start_pt, arrowprops=arrow, zorder=4)
 
     # 하단 범례 표시
     legend_text = "↔ 쌍방향·강함     ➔ 일방향·보통     ---> 점선·약함"
-    ax.text(0, -1.45, legend_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=9.5, weight='bold'),
+    ax.text(0, -1.25, legend_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8.5, weight='bold'),
             ha='center', va='center', color='#2D3436')
 
-    ax.set_xlim(-1.5, 1.5)
-    ax.set_ylim(-1.5, 1.5)
+    ax.set_xlim(-1.3, 1.3)
+    ax.set_ylim(-1.3, 1.3)
     plt.axis("off")
     plt.tight_layout()
     return fig
@@ -243,5 +243,5 @@ with col2:
     st.markdown("---")
     st.markdown("""
     **개선 사항:**
-    - 체계로 향하는 일방향 화살표 머리가 네모 상자 겉에 딱 멈추도록 오프셋을 정밀하게 보정했습니다.
+    - 외부 가이드 원의 크기를 타이트하게 축소하여 공백을 최소화했습니다.
     """)
