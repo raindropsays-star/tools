@@ -103,11 +103,11 @@ if selected_tool == "🌳 사례관리 생태도":
         else: start_angle, end_angle = -np.pi * 0.35, np.pi * 0.35
 
         if count <= 4:
-            radii = [0.75] * count
+            radii = [0.78] * count
             angles = np.linspace(start_angle, end_angle, count + 2)[1:-1] if count > 1 else [(start_angle + end_angle)/2]
         else:
             half = (count + 1) // 2
-            radii = [0.68] * half + [0.85] * (count - half)
+            radii = [0.70] * half + [0.88] * (count - half)
             angles_inner = np.linspace(start_angle, end_angle, half + 2)[1:-1]
             angles_outer = np.linspace(start_angle, end_angle, (count - half) + 2)[1:-1]
             angles = list(angles_inner) + list(angles_outer)
@@ -143,18 +143,37 @@ if selected_tool == "🌳 사례관리 생태도":
         ax.scatter(0, 0, s=1800, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.0, zorder=2)
         ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=9.5, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3)
 
-        # 체계 노드 상자 (폰트: 6.8pt, pad=0.22로 더욱 슬림하게 축소)
+        # 체계 노드 상자 (체계명 7.5pt, 역할 6.0pt로 폰트 크기 차등 적용)
         def draw_node_box(n_list, bg_color, border_color):
             for n in n_list:
                 x, y = pos[n['name']]
-                full_text = f"{n['name']}\n({n['role']})" if n.get('role') else f"{n['name']}"
-                bbox_props = dict(boxstyle="round,pad=0.22", fc=bg_color, ec=border_color, lw=1.2)
-                ax.text(x, y, full_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3, bbox=bbox_props, linespacing=1.2)
+                
+                # 박스 배경
+                bbox_props = dict(boxstyle="round,pad=0.25", fc=bg_color, ec=border_color, lw=1.2)
+                
+                if n.get('role'):
+                    disp_text = f"{n['name']}\n({n['role']})"
+                else:
+                    disp_text = f"{n['name']}"
+
+                # 더미 텍스트로 박스 배경만 먼저 그리기
+                t_bg = ax.text(x, y, disp_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.2, weight='bold'),
+                               ha='center', va='center', color='none', zorder=3, bbox=bbox_props, linespacing=1.2)
+
+                # 실제 텍스트: 체계명과 역할을 위치/폰트 분리하여 수동 정렬
+                if n.get('role'):
+                    ax.text(x, y + 0.025, n['name'], fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'),
+                            ha='center', va='center', color='#2D3436', zorder=4)
+                    ax.text(x, y - 0.028, f"({n['role']})", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.0),
+                            ha='center', va='center', color='#636E72', zorder=4)
+                else:
+                    ax.text(x, y, n['name'], fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'),
+                            ha='center', va='center', color='#2D3436', zorder=4)
 
         draw_node_box(official, "#E3F2FD", "#90CAF9")
         draw_node_box(unofficial, "#E8F5E9", "#A5D6A7")
 
-        # 슬림해진 상자 크기에 딱 맞춘 화살표 오프셋 보정 (상자쪽: 22pt, 원쪽: 22pt)
+        # 화살표 오프셋 정밀 보정 (상자 침범 및 공중부양 문제 완전 해결)
         for n in nodes:
             target_x, target_y = pos[n['name']]
             lw = 2.2 if "강" in n['strength'] else (1.0 if "약" in n['strength'] else 1.4)
@@ -166,7 +185,7 @@ if selected_tool == "🌳 사례관리 생태도":
                 sA, sB = 22, 22
             elif "대상자 ➔ 체계" in n['direction']: 
                 start_pt, end_pt, arr_style = (0, 0), (target_x, target_y), "->"
-                sA, sB = 22, 22
+                sA, sB = 22, 36  # 체계 상자 침범 방지를 위해 shrinkB를 36으로 확장
             elif "쌍방향" in n['direction']: 
                 start_pt, end_pt, arr_style = (target_x, target_y), (0, 0), "<->"
                 sA, sB = 22, 22
@@ -175,7 +194,7 @@ if selected_tool == "🌳 사례관리 생태도":
                 sA, sB = 22, 22
 
             arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=sA, shrinkB=sB)
-            ax.annotate("", xy=end_pt, xytext=start_pt, arrowprops=arrow, zorder=4)
+            ax.annotate("", xy=end_pt, xytext=start_pt, arrowprops=arrow, zorder=5)
 
         ax.text(0, -1.3, "↔ 쌍방향·강함     ➔ 일방향·보통     ---> 점선·약함", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#2D3436')
         
