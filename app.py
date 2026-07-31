@@ -24,10 +24,10 @@ plt.rcParams['axes.unicode_minus'] = False
 
 st.set_page_config(page_title="사례관리 스마트 생태도/가계도 생성기", layout="wide")
 
-# 상단 여백 제거
+# 상단 여백 원천 차단 CSS
 st.markdown("""
 <style>
-    .block-container { padding-top: 0.0rem !important; padding-bottom: 0.0rem !important; }
+    .block-container { padding-top: 0rem !important; padding-bottom: 0rem !important; margin-top: -20px !important; }
     header { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
@@ -224,7 +224,7 @@ if selected_tool == "🌳 사례관리 생태도":
     st.download_button(label="💾 생태도 고화질 이미지 다운로드 (PNG)", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png")
 
 # =============================================================
-# [MODE 2] 가계도 모드 (상단 밀착 정렬 및 통합 유기적 동거 영역)
+# [MODE 2] 가계도 모드 (화면 최상단 밀착 정렬 및 동거 영역 복원)
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
@@ -265,8 +265,8 @@ else:
             st.rerun()
 
     def draw_pretty_genogram(client, members):
-        # 상단 밀착 배치 및 3대 전체가 한눈에 들어오도록 캔버스 높이/좌표 최적화
-        fig, ax = plt.subplots(figsize=(6.0, 5.2), dpi=200)
+        # 캔버스 크기를 타이트하게 잡고 상단 밀착 배치를 위해 좌표계 세팅
+        fig, ax = plt.subplots(figsize=(6.0, 4.8), dpi=200)
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
@@ -304,14 +304,14 @@ else:
             ax.text(x, y - box_s/2 - 0.07, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                     ha='center', va='top', color='#2D3436', zorder=5)
 
-        # 1. 당사자 및 배우자 (상단 최적화 위치)
-        cx, cy = (0, 0.65) if (not spouse and not cohabitants) else (-0.45, 0.65)
+        # 1. 당사자 및 배우자 (화면 맨 위로 바짝 끌어올림: Y = 0.85)
+        cx, cy = (0, 0.85) if (not spouse and not cohabitants) else (-0.45, 0.85)
         draw_person(cx, cy, client['name'], client['age'], client['gender'], client['is_alive'], is_target=True)
         if client.get('is_cohabit', True): 
             cohabit_coords.append((cx, cy))
 
         if spouse:
-            sx, sy = (0.45, 0.65)
+            sx, sy = (0.45, 0.85)
             sp = spouse[0]
             draw_person(sx, sy, sp['name'], sp['age'], sp['gender'], sp['is_alive'])
             if sp.get('is_cohabit', False): 
@@ -362,7 +362,7 @@ else:
 
         if cohabitants and not spouse:
             coh = cohabitants[0]
-            coh_x, coh_y = (0.45, 0.65)
+            coh_x, coh_y = (0.45, 0.85)
             draw_person(coh_x, coh_y, coh['name'], coh['age'], coh['gender'], coh['is_alive'])
             if coh.get('is_cohabit', True): 
                 cohabit_coords.append((coh_x, coh_y))
@@ -373,9 +373,9 @@ else:
             ax.text(mid_x, cy + 0.08, "동거인", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                     ha='center', va='center', color='#2E7D32', zorder=4, bbox=lbl_bbox)
 
-        # 2. 부모님 (1세대)
+        # 2. 부모님 (1세대 - 만약 있다면 당사자 위쪽)
         if parents:
-            py = 1.15
+            py = 1.30
             father = [p for p in parents if "부" in p['relation']]
             mother = [p for p in parents if "모" in p['relation']]
             p_fx, p_mx = -0.45, 0.45
@@ -396,11 +396,11 @@ else:
                 ax.plot([0, cx], [p_mid_y, p_mid_y], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
                 ax.plot([cx, cx], [p_mid_y, cy + 0.1], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
 
-        # 3. 자녀 세대 배치
+        # 3. 자녀 세대 배치 (Y = 0.30)
         child_coords_map = {}
         if children:
-            chy = 0.10
-            branch_y = 0.40
+            chy = 0.30
+            branch_y = 0.60
             
             family_groups = []
             for ch_idx, ch in enumerate(children):
@@ -447,7 +447,7 @@ else:
                         cohabit_coords.append((il_x, chy))
 
                     if grand_children:
-                        gcy = -0.45
+                        gcy = -0.25
                         gc_mid = (ch_x + il_x) / 2
                         ax.plot([gc_mid, gc_mid], [chy, chy - 0.18], color='#2D3436', lw=1.2, zorder=1)
                         
@@ -501,7 +501,7 @@ else:
 
         # 5. 반려동물
         if pets:
-            pet_y = 0.10 if not children else -0.45
+            pet_y = 0.30 if not children else -0.25
             pet_x = 1.10
             for p_idx, pt in enumerate(pets):
                 px = pet_x - (p_idx * 0.28)
@@ -509,14 +509,13 @@ else:
                 if pt.get('is_cohabit'): 
                     cohabit_coords.append((px, pet_y))
 
-        # 6. [통합 유기적 동거 영역] 동거인들을 하나의 테두리로 감싸되 다각형 버블로 통합 생성
+        # 6. [통합 유기적 동거 영역]
         if len(cohabit_coords) > 0:
             pts = np.array(cohabit_coords)
             min_x, max_x = min(pts[:, 0]) - 0.22, max(pts[:, 0]) + 0.22
             min_y, max_y = min(pts[:, 1]) - 0.20, max(pts[:, 1]) + 0.20
             w, h = max_x - min_x, max_y - min_y
             
-            # 단일 통검 사각형 버블이 아니라 동거인들만 감싸는 포괄형 박스 생성
             co_bubble = patches.FancyBboxPatch(
                 (min_x, min_y), w, h,
                 boxstyle="round,pad=0.08,rounding_size=0.15",
@@ -525,11 +524,11 @@ else:
             ax.add_patch(co_bubble)
             ax.text(min_x + 0.02, max_y + 0.02, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), color='#1B5E20', zorder=1)
 
-        ax.text(0, -0.85, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#636E72')
+        ax.text(0, -0.65, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#636E72')
         
-        # 상단 밀착을 위한 Y축 범위 재조정 (0.0 ~ 1.3 구간으로 끌어올림)
+        # [상단 밀착 정렬] Y축 범위를 위쪽으로 바짝 붙여서 생성 (0.0 ~ 1.5 구간)
         ax.set_xlim(-1.60, 1.60)
-        ax.set_ylim(-0.95, 1.35)
+        ax.set_ylim(-0.75, 1.45)
         plt.axis("off")
         plt.tight_layout(pad=0.0)
         return fig
