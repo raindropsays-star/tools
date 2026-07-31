@@ -144,21 +144,18 @@ if selected_tool == "🌳 사례관리 생태도":
         ax.scatter(0, 0, s=1800, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.0, zorder=2)
         ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=9.5, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3)
 
-        # 체계 노드 상자 (자연스러운 내장 bbox 자동 피팅 구조로 복원)
+        # 체계 노드 상자
         def draw_node_box(n_list, bg_color, border_color):
             for n in n_list:
                 x, y = pos[n['name']]
                 
-                # 콤팩트한 슬림 상자 스타일
                 bbox_props = dict(boxstyle="round,pad=0.3", fc=bg_color, ec=border_color, lw=1.3)
                 
                 if n.get('role'):
-                    # 체계명 6.8pt / 역할 5.0pt 차등 적용한 통합 문자열
                     full_text = f"{n['name']}\n({n['role']})"
                 else:
                     full_text = f"{n['name']}"
 
-                # 단일 text 객체로 자연스러운 행간(linespacing=1.2) 형성
                 ax.text(x, y, full_text, 
                         fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'),
                         ha='center', va='center', color='#2D3436', zorder=3, bbox=bbox_props, linespacing=1.25)
@@ -166,25 +163,32 @@ if selected_tool == "🌳 사례관리 생태도":
         draw_node_box(official, "#E3F2FD", "#90CAF9")
         draw_node_box(unofficial, "#E8F5E9", "#A5D6A7")
 
-        # 화살표 연결 (자동 피팅 박스 테두리에 맞춰 오프셋 12pt/20pt 설정)
+        # 화살표 방향 및 위치별 정밀 여백(shrink) 분기
         for n in nodes:
             target_x, target_y = pos[n['name']]
             lw = 2.2 if "강" in n['strength'] else (1.0 if "약" in n['strength'] else 1.4)
             style = 'dashed' if "약" in n['strength'] else 'solid'
             color = '#000000' if "강" in n['strength'] else ('#636E72' if "약" in n['strength'] else '#2D3436')
 
+            # 수평 노드(Y축 절대값이 0.2 미만) 여부 확인
+            is_horizontal = abs(target_y) < 0.2
+
             if "체계 ➔ 대상자" in n['direction']: 
                 p_start, p_end, arr_style = (target_x, target_y), (0, 0), "->"
-                sA, sB = 16, 20
+                sA = 10 if not is_horizontal else 14  # 체계 상자 쪽
+                sB = 22                             # 중앙 원 쪽
             elif "대상자 ➔ 체계" in n['direction']: 
                 p_start, p_end, arr_style = (0, 0), (target_x, target_y), "->"
-                sA, sB = 20, 16
+                sA = 22                             # 중앙 원 쪽
+                sB = 32 if is_horizontal else 18    # 수평 화살표는 박스 안 침범 방지 위해 32pt로 확장!
             elif "쌍방향" in n['direction']: 
                 p_start, p_end, arr_style = (target_x, target_y), (0, 0), "<->"
-                sA, sB = 16, 20
+                sA = 10 if not is_horizontal else 14
+                sB = 22
             else: 
                 p_start, p_end, arr_style = (target_x, target_y), (0, 0), "-"
-                sA, sB = 16, 20
+                sA = 10 if not is_horizontal else 14
+                sB = 22
 
             arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=sA, shrinkB=sB)
             ax.annotate("", xy=p_end, xytext=p_start, arrowprops=arrow, zorder=5)
