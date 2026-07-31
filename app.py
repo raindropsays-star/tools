@@ -26,11 +26,10 @@ st.set_page_config(page_title="사례관리 스마트 생태도/가계도 생성
 
 st.markdown("""
 <style>
-    .main-title { font-size: 1.6rem; font-weight: bold; color: #2C3E50; margin-bottom: 0.5rem; }
-    .block-container { padding-top: 1.2rem; padding-bottom: 1rem; }
-    @media print {
-        .stSidebar, .stTabs [role="tablist"], button { display: none !important; }
-    }
+    .main-title { font-size: 1.5rem; font-weight: bold; color: #2C3E50; margin-bottom: 0.5rem; }
+    .block-container { padding-top: 1rem; padding-bottom: 1rem; }
+    /* 차트 중앙 정렬 */
+    .stPlotlyChart, .stImage, div[data-testid="stImage"] { display: flex; justify-content: center; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -104,8 +103,9 @@ with tab1:
             positions[n['name']] = (radii[idx] * np.cos(angles[idx]), radii[idx] * np.sin(angles[idx]))
         return positions
 
+    # 한 화면에 쏙 들어오도록 컴팩트 스케일(4.8 x 4.8)로 축소
     def draw_pretty_ecomap(nodes, client_name):
-        fig, ax = plt.subplots(figsize=(6.2, 6.2), dpi=200)
+        fig, ax = plt.subplots(figsize=(4.8, 4.8), dpi=200)
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
@@ -121,49 +121,49 @@ with tab1:
         ax.add_patch(plt.Circle((0, 0), circle_r, color='#B2BEC3', fill=False, linestyle='-', linewidth=1.2))
         ax.plot([0, 0], [-circle_r, circle_r], color='#B2BEC3', linestyle='--', linewidth=1.5, zorder=1)
 
-        bbox_official = dict(boxstyle="round,pad=0.4", fc="#E3F2FD", ec="#1E88E5", lw=1.8)
-        bbox_unofficial = dict(boxstyle="round,pad=0.4", fc="#E8F5E9", ec="#43A047", lw=1.8)
+        bbox_official = dict(boxstyle="round,pad=0.35", fc="#E3F2FD", ec="#1E88E5", lw=1.6)
+        bbox_unofficial = dict(boxstyle="round,pad=0.35", fc="#E8F5E9", ec="#43A047", lw=1.6)
 
-        ax.text(-0.52, circle_r, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=12.5, weight='bold'), ha='center', va='center', color='#0D47A1', zorder=2, bbox=bbox_official)
-        ax.text(0.52, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=12.5, weight='bold'), ha='center', va='center', color='#1B5E20', zorder=2, bbox=bbox_unofficial)
+        ax.text(-0.52, circle_r, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=11, weight='bold'), ha='center', va='center', color='#0D47A1', zorder=2, bbox=bbox_official)
+        ax.text(0.52, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=11, weight='bold'), ha='center', va='center', color='#1B5E20', zorder=2, bbox=bbox_unofficial)
 
-        ax.scatter(0, 0, s=2800, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.2, zorder=2)
-        ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=12, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3)
+        ax.scatter(0, 0, s=2200, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.0, zorder=2)
+        ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10.5, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3)
 
         def draw_node_box(n_list, bg_color, border_color):
             for n in n_list:
                 x, y = pos[n['name']]
                 full_text = f"{n['name']}\n({n['role']})" if n.get('role') else f"{n['name']}"
-                bbox_props = dict(boxstyle="round,pad=0.5", fc=bg_color, ec=border_color, lw=1.5)
-                ax.text(x, y, full_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=9, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3, bbox=bbox_props, linespacing=1.2)
+                bbox_props = dict(boxstyle="round,pad=0.45", fc=bg_color, ec=border_color, lw=1.4)
+                ax.text(x, y, full_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8.5, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3, bbox=bbox_props, linespacing=1.2)
 
         draw_node_box(official, "#E3F2FD", "#90CAF9")
         draw_node_box(unofficial, "#E8F5E9", "#A5D6A7")
 
         for n in nodes:
             target_x, target_y = pos[n['name']]
-            lw = 2.6 if "강" in n['strength'] else (1.1 if "약" in n['strength'] else 1.6)
+            lw = 2.4 if "강" in n['strength'] else (1.0 if "약" in n['strength'] else 1.5)
             style = 'dashed' if "약" in n['strength'] else 'solid'
             color = '#000000' if "강" in n['strength'] else ('#636E72' if "약" in n['strength'] else '#2D3436')
 
-            if "체계 ➔ 대상자" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "->", 38, 35
-            elif "대상자 ➔ 체계" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (0, 0), (target_x, target_y), "->", 35, 38
-            elif "쌍방향" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "<->", 38, 35
-            else: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "-", 38, 35
+            if "체계 ➔ 대상자" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "->", 35, 30
+            elif "대상자 ➔ 체계" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (0, 0), (target_x, target_y), "->", 30, 35
+            elif "쌍방향" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "<->", 35, 30
+            else: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "-", 35, 30
 
             arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=sA, shrinkB=sB)
             ax.annotate("", xy=end_pt, xytext=start_pt, arrowprops=arrow, zorder=4)
 
-        ax.text(0, -1.25, "↔ 쌍방향·강함     ➔ 일방향·보통     ---> 점선·약함", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8.5, weight='bold'), ha='center', va='center', color='#2D3436')
+        ax.text(0, -1.25, "↔ 쌍방향·강함     ➔ 일방향·보통     ---> 점선·약함", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#2D3436')
         ax.set_xlim(-1.35, 1.35)
         ax.set_ylim(-1.35, 1.35)
         plt.axis("off")
         plt.tight_layout()
         return fig
 
-    # 메인 차트 및 다운로드 영역
+    # 스크린 피팅 렌더링
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
-    st.pyplot(fig1)
+    st.pyplot(fig1, use_container_width=False)
 
     buf1 = io.BytesIO()
     fig1.savefig(buf1, format="png", bbox_inches='tight', dpi=300)
@@ -185,7 +185,7 @@ with tab2:
             {"relation": "자녀", "name": "장녀", "gender": "여성", "age": "42", "is_alive": True, "rel_type": "소원/불화"}
         ]
 
-    # 좌측 사이드바 입력 구성 (가계도 전용)
+    # 좌측 사이드바 입력 구성 (가계도)
     st.sidebar.markdown("---")
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
     gc_name = st.sidebar.text_input("당사자 이름", value=st.session_state.gen_client['name'], key="gen_name")
@@ -218,9 +218,9 @@ with tab2:
             st.session_state.family_members.pop(idx)
             st.rerun()
 
-    # 가계도 그리기 함수 (글자 겹침 해결 및 정밀 레이아웃)
+    # 가계도 그리기 함수 (4.8 x 4.8 스케일)
     def draw_pretty_genogram(client, members):
-        fig, ax = plt.subplots(figsize=(6.5, 6.5), dpi=200)
+        fig, ax = plt.subplots(figsize=(4.8, 4.8), dpi=200)
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
@@ -228,7 +228,6 @@ with tab2:
         spouse = [m for m in members if "배우자" in m['relation']]
         children = [m for m in members if "자녀" in m['relation']]
 
-        # 기호 그리기 (남: 네모, 여: 원, 사망: X)
         def draw_person(x, y, name, age, gender, is_alive, is_target=False):
             box_s = 0.28
             color = '#FFEAA7' if is_target else ('#E3F2FD' if gender == '남성' else '#FCE4EC')
@@ -246,12 +245,10 @@ with tab2:
                 ax.plot([x - box_s/2.5, x + box_s/2.5], [y - box_s/2.5, y + box_s/2.5], color='#D63031', lw=2, zorder=5)
                 ax.plot([x - box_s/2.5, x + box_s/2.5], [y + box_s/2.5, y - box_s/2.5], color='#D63031', lw=2, zorder=5)
 
-            # 텍스트 오프셋 확장 (글씨가 아래 선과 겹치지 않게 거리 확보)
             disp_txt = f"{name}\n({age}세)" if is_alive else f"{name}\n(사망)"
-            ax.text(x, y - box_s/2 - 0.1, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8.5, weight='bold'),
+            ax.text(x, y - box_s/2 - 0.1, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'),
                     ha='center', va='top', color='#2D3436', zorder=5)
 
-        # 2세대 (당사자 & 배우자) 위치
         cx, cy = (0, 0.1) if not spouse else (-0.45, 0.1)
         draw_person(cx, cy, client['name'], client['age'], client['gender'], client['is_alive'], is_target=True)
 
@@ -259,44 +256,33 @@ with tab2:
             sx, sy = (0.45, 0.1)
             sp = spouse[0]
             draw_person(sx, sy, sp['name'], sp['age'], sp['gender'], sp['is_alive'])
-            
-            # 부부 혼인선
             line_style = '-' if sp['rel_type'] != '소원/불화' else '--'
             color = '#D63031' if sp['rel_type'] == '소원/불화' else '#2D3436'
             ax.plot([cx + 0.14, sx - 0.14], [cy, sy], color=color, linestyle=line_style, lw=2, zorder=2)
             if sp['rel_type'] == '밀접/친밀':
                 ax.plot([cx + 0.14, sx - 0.14], [cy + 0.03, sy + 0.03], color='#1976D2', lw=2, zorder=2)
 
-        # 1세대 (부모님)
         if parents:
             py = 0.9
             father = [p for p in parents if "부" in p['relation']]
             mother = [p for p in parents if "모" in p['relation']]
             
-            p_fx = -0.45
-            p_mx = 0.45
+            p_fx, p_mx = -0.45, 0.45
 
-            if father:
-                draw_person(p_fx, py, father[0]['name'], father[0]['age'], father[0]['gender'], father[0]['is_alive'])
-            if mother:
-                draw_person(p_mx, py, mother[0]['name'], mother[0]['age'], mother[0]['gender'], mother[0]['is_alive'])
+            if father: draw_person(p_fx, py, father[0]['name'], father[0]['age'], father[0]['gender'], father[0]['is_alive'])
+            if mother: draw_person(p_mx, py, mother[0]['name'], mother[0]['age'], mother[0]['gender'], mother[0]['is_alive'])
 
-            # 부모 연결 및 자식(당사자) 내림선
             if father and mother:
                 ax.plot([p_fx + 0.14, p_mx - 0.14], [py, py], color='#B2BEC3', linestyle='--', lw=1.5, zorder=1)
                 ax.plot([0, 0], [py, py - 0.3], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
                 ax.plot([0, cx], [py - 0.3, cy + 0.14], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
-            elif father:
-                ax.plot([p_fx, cx], [py - 0.14, cy + 0.14], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
-            elif mother:
-                ax.plot([p_mx, cx], [py - 0.14, cy + 0.14], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
+            elif father: ax.plot([p_fx, cx], [py - 0.14, cy + 0.14], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
+            elif mother: ax.plot([p_mx, cx], [py - 0.14, cy + 0.14], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
 
-        # 3세대 (자녀) - 글자 아래로 깊게 내려서 연결선 형성 (겹침 완벽 방지)
         if children:
             chy = -0.85
-            branch_y = -0.42  # 글씨 아래쪽으로 가지선을 내려서 배치
+            branch_y = -0.42
             ch_xs = np.linspace(-0.55, 0.55, len(children))
-            
             mid_x = (cx + sx)/2 if spouse else cx
             ax.plot([mid_x, mid_x], [cy, branch_y], color='#2D3436', lw=1.5, zorder=1)
             
@@ -308,17 +294,16 @@ with tab2:
                 draw_person(chx, chy, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
                 ax.plot([chx, chx], [branch_y, chy + 0.14], color='#2D3436', lw=1.5, zorder=1)
 
-        # 하단 범례
-        ax.text(0, -1.35, "□ 남성   ○ 여성   [색상/굵은선] 당사자   [X] 사망   ═ 밀접   --- 불화", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8.5, weight='bold'), ha='center', va='center', color='#636E72')
+        ax.text(0, -1.35, "□ 남성   ○ 여성   [색상/굵은선] 당사자   [X] 사망   ═ 밀접   --- 불화", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#636E72')
         ax.set_xlim(-1.35, 1.35)
         ax.set_ylim(-1.35, 1.35)
         plt.axis("off")
         plt.tight_layout()
         return fig
 
-    # 메인 차트 및 다운로드 영역
+    # 스크린 피팅 렌더링
     fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members)
-    st.pyplot(fig2)
+    st.pyplot(fig2, use_container_width=False)
 
     buf2 = io.BytesIO()
     fig2.savefig(buf2, format="png", bbox_inches='tight', dpi=300)
