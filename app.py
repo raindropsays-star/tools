@@ -40,7 +40,7 @@ if "nodes" not in st.session_state:
         {"name": "방문진료", "role": "월 1회 정기 검진", "type": "공식체계", "strength": "보통", "direction": "체계 ➔ 대상자"},
         {"name": "보건소", "role": "맞춤형 방문건강", "type": "공식체계", "strength": "보통", "direction": "체계 ➔ 대상자"},
         {"name": "노인맞춤돌봄", "role": "안부확인", "type": "공식체계", "strength": "보통", "direction": "체계 ➔ 대상자"},
-        {"name": "오래된 친구", "role": "정서적 지지", "type": "비공식체계", "strength": "강함", "direction": "대상자 ➔ 체계"},
+        {"name": "오래된 친구", "role": "정서적 지지", "type": "비공식체계", "strength": "강함", "direction": "쌍방향 (↔)"},
         {"name": "경로당", "role": "여가 이용", "type": "비공식체계", "strength": "약함", "direction": "대상자 ➔ 체계"}
     ]
 
@@ -88,7 +88,7 @@ for i, node in enumerate(st.session_state.nodes):
         st.session_state.nodes.pop(i)
         st.rerun()
 
-# 위치 계산 함수 (원 반지름 및 노드 위치)
+# 위치 계산 함수
 def calculate_positions(node_list, is_official):
     positions = {}
     count = len(node_list)
@@ -144,38 +144,7 @@ def draw_pretty_ecomap(nodes, client_name):
     # 2. 중앙 세로 수직 점선
     ax.plot([0, 0], [-circle_r, circle_r], color='#B2BEC3', linestyle='--', linewidth=1.5, zorder=1)
 
-    # 3. 상단 타이틀 (크기 13pt로 확대, 굵은 글씨, 괄호 제거)
-    ax.text(-0.55, circle_r - 0.08, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=13, weight='bold'),
-            ha='center', va='top', color='#000000')
-    ax.text(0.55, circle_r - 0.08, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=13, weight='bold'),
-            ha='center', va='top', color='#000000')
-
-    # 4. 중앙 대상자 노드
-    ax.scatter(0, 0, s=3600, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.5, zorder=3)
-    ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=14, weight='bold'),
-            ha='center', va='center', color='#2D3436', zorder=4)
-
-    # 5. 체계 노드 그리기 (박스 여백 pad=0.7로 대폭 확대하여 역할 설명 포함 완벽 감싸기)
-    def draw_node_box(n_list, bg_color, border_color):
-        for n in n_list:
-            x, y = pos[n['name']]
-            
-            # 박스 내부 텍스트 구성 (이름 + 역할)
-            if n.get('role'):
-                full_text = f"{n['name']}\n({n['role']})"
-            else:
-                full_text = f"{n['name']}"
-
-            # pad=0.75 로 여백을 넉넉히 주어 노드 상자가 글자를 깔끔하게 완벽 감싸도록 조정
-            bbox_props = dict(boxstyle="round,pad=0.75", fc=bg_color, ec=border_color, lw=1.8)
-            
-            ax.text(x, y, full_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10, weight='bold'),
-                    ha='center', va='center', color='#2D3436', zorder=5, bbox=bbox_props, linespacing=1.3)
-
-    draw_node_box(official, "#E3F2FD", "#90CAF9")
-    draw_node_box(unofficial, "#E8F5E9", "#A5D6A7")
-
-    # 6. 선 형태 및 화살표 연결 (확대된 상자 크기에 맞게 shrink 조정)
+    # 3. 화살표 연결 (노드 박스보다 먼저 그려서 화살표 머리가 가려지지 않도록 zorder 조정)
     for n in nodes:
         target_x, target_y = pos[n['name']]
         
@@ -209,8 +178,41 @@ def draw_pretty_ecomap(nodes, client_name):
             end_pt = (0, 0)
             arr_style = "-"
 
-        arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=28, shrinkB=28)
+        # shrinkA, shrinkB를 정밀하게 줄여서 화살표 머리가 박스 경계에 또렷이 드러나도록 수정
+        arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=38, shrinkB=22)
         ax.annotate("", xy=end_pt, xytext=start_pt, arrowprops=arrow, zorder=2)
+
+    # 4. 상단 타이틀
+    bbox_official = dict(boxstyle="round,pad=0.5", fc="#E3F2FD", ec="#1E88E5", lw=2)
+    bbox_unofficial = dict(boxstyle="round,pad=0.5", fc="#E8F5E9", ec="#43A047", lw=2)
+
+    ax.text(-0.55, circle_r, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=15, weight='bold'),
+            ha='center', va='center', color='#0D47A1', zorder=5, bbox=bbox_official)
+    ax.text(0.55, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=15, weight='bold'),
+            ha='center', va='center', color='#1B5E20', zorder=5, bbox=bbox_unofficial)
+
+    # 5. 중앙 대상자 노드
+    ax.scatter(0, 0, s=3600, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.5, zorder=3)
+    ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=14, weight='bold'),
+            ha='center', va='center', color='#2D3436', zorder=4)
+
+    # 6. 체계 노드 그리기
+    def draw_node_box(n_list, bg_color, border_color):
+        for n in n_list:
+            x, y = pos[n['name']]
+            
+            if n.get('role'):
+                full_text = f"{n['name']}\n({n['role']})"
+            else:
+                full_text = f"{n['name']}"
+
+            bbox_props = dict(boxstyle="round,pad=0.6", fc=bg_color, ec=border_color, lw=1.8)
+            
+            ax.text(x, y, full_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10, weight='bold'),
+                    ha='center', va='center', color='#2D3436', zorder=5, bbox=bbox_props, linespacing=1.3)
+
+    draw_node_box(official, "#E3F2FD", "#90CAF9")
+    draw_node_box(unofficial, "#E8F5E9", "#A5D6A7")
 
     # 하단 범례 표시
     legend_text = "↔ 쌍방향·강함     ➔ 일방향·보통     ---> 점선·약함"
@@ -237,6 +239,5 @@ with col2:
     st.markdown("---")
     st.markdown("""
     **개선 사항:**
-    - 상단 '공식체계', '비공식체계' 타이틀이 더 크고 또렷해졌습니다.
-    - 네모 박스가 충분히 넓어져 역할 설명이 완전히 박스 안으로 들어왔습니다.
+    - 쌍방향 화살표 머리가 네모 박스 바깥에 선명히 드러나도록 여백 처리를 수정했습니다.
     """)
