@@ -116,13 +116,12 @@ if selected_tool == "🌳 사례관리 생태도":
             positions[n['name']] = (radii[idx] * np.cos(angles[idx]), radii[idx] * np.sin(angles[idx]))
         return positions
 
-    # 상자 테두리 마진(0.012)을 반영한 정밀 교차점 함수
+    # 상자 테두리 교차점 함수
     def get_box_intersection_precise(center_x, center_y, width, height, target_x, target_y):
         dx = target_x - center_x
         dy = target_y - center_y
         if dx == 0 and dy == 0: return center_x, center_y
         
-        # 테두리 라인 오프셋 보정
         w_margin = width / 2 + 0.012
         h_margin = height / 2 + 0.012
         
@@ -160,8 +159,8 @@ if selected_tool == "🌳 사례관리 생태도":
         ax.scatter(0, 0, s=1800, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.0, zorder=2)
         ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=9.5, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3)
 
-        # 노드 상자 규격 (가로 0.38 / 세로 0.13 여유있는 황금비율 직사각형)
-        box_w, box_h = 0.38, 0.13
+        # 노드 상자 규격 (가로 0.38 / 세로 0.145 로 넉넉하게 확장)
+        box_w, box_h = 0.38, 0.145
 
         def draw_node_box(n_list, bg_color, border_color):
             for n in n_list:
@@ -174,10 +173,11 @@ if selected_tool == "🌳 사례관리 생태도":
                 )
                 ax.add_patch(rect)
 
+                # 글씨 간격(Y오프셋)을 확장하여 겹침 현상 완전 제거 (+0.028 / -0.032)
                 if n.get('role'):
-                    ax.text(x, y + 0.022, n['name'], fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.2, weight='bold'),
+                    ax.text(x, y + 0.028, n['name'], fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.2, weight='bold'),
                             ha='center', va='center', color='#2D3436', zorder=4)
-                    ax.text(x, y - 0.025, f"({n['role']})", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=5.0),
+                    ax.text(x, y - 0.032, f"({n['role']})", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=5.0),
                             ha='center', va='center', color='#636E72', zorder=4)
                 else:
                     ax.text(x, y, n['name'], fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.2, weight='bold'),
@@ -186,17 +186,15 @@ if selected_tool == "🌳 사례관리 생태도":
         draw_node_box(official, "#E3F2FD", "#90CAF9")
         draw_node_box(unofficial, "#E8F5E9", "#A5D6A7")
 
-        # 화살표 그리기 (1px 오차 없는 완벽 밀착 연산)
+        # 화살표 그리기
         for n in nodes:
             x, y = pos[n['name']]
             lw = 2.0 if "강" in n['strength'] else (1.0 if "약" in n['strength'] else 1.3)
             style = 'dashed' if "약" in n['strength'] else 'solid'
             color = '#000000' if "강" in n['strength'] else ('#636E72' if "약" in n['strength'] else '#2D3436')
 
-            # 박스 정밀 교차점
             bx, by = get_box_intersection_precise(x, y, box_w, box_h, 0, 0)
             
-            # 중앙 원 정밀 교차점
             angle = np.arctan2(y, x)
             cx = (center_r + 0.01) * np.cos(angle)
             cy = (center_r + 0.01) * np.sin(angle)
@@ -210,7 +208,6 @@ if selected_tool == "🌳 사례관리 생태도":
             else:
                 p_from, p_to, a_style = (bx, by), (cx, cy), "-"
 
-            # 날렵하고 또렷한 화살표 머리(mutation_scale=8.5)
             arrow_patch = patches.FancyArrowPatch(
                 p_from, p_to,
                 arrowstyle=a_style, linestyle=style, linewidth=lw,
