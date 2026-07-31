@@ -50,6 +50,8 @@ if "gen_client" not in st.session_state:
 
 if "family_members" not in st.session_state:
     st.session_state.family_members = [
+        {"relation": "부(아버지)", "name": "아버지", "gender": "남성", "age": "사망", "is_alive": False, "rel_type": "보통", "is_cohabit": False},
+        {"relation": "모(어머니)", "name": "어머니", "gender": "여성", "age": "사망", "is_alive": False, "rel_type": "보통", "is_cohabit": False},
         {"relation": "배우자", "name": "배우자", "gender": "여성", "age": "68", "is_alive": True, "rel_type": "밀접/친밀", "is_cohabit": True},
         {"relation": "자녀", "name": "장남", "gender": "남성", "age": "45", "is_alive": True, "rel_type": "보통", "is_cohabit": True},
         {"relation": "사위/며느리", "name": "큰며느리", "gender": "여성", "age": "40", "is_alive": True, "rel_type": "보통", "is_cohabit": True}
@@ -221,7 +223,7 @@ if selected_tool == "🌳 사례관리 생태도":
     st.download_button(label="💾 생태도 고화질 이미지 다운로드 (PNG)", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png")
 
 # =============================================================
-# [MODE 2] 가계도 모드 (1자 직하강 자녀선 스마트 연결 적용)
+# [MODE 2] 가계도 모드 (사선 제거, 완전 직각/수직 그리드 적용)
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
@@ -366,7 +368,7 @@ else:
             ax.text(mid_x, cy + 0.08, "동거인", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'),
                     ha='center', va='center', color='#2E7D32', zorder=4, bbox=lbl_bbox)
 
-        # 2. 부모님 (1세대)
+        # 2. 부모님 (1세대) - 부모님이 실제로 등록된 경우에만 직각 연결선 생성
         if parents:
             py = 0.95
             father = [p for p in parents if "부" in p['relation']]
@@ -381,11 +383,15 @@ else:
                 if mother[0].get('is_cohabit'): cohabit_coords.append((p_mx, py))
 
             if father and mother:
+                # 부모 연결 수평선
                 ax.plot([p_fx + 0.1, p_mx - 0.1], [py, py], color='#B2BEC3', linestyle='--', lw=1.2, zorder=1)
-                ax.plot([0, 0], [py, py - 0.25], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
-                ax.plot([0, cx], [py - 0.25, cy + 0.1], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
+                # 직각 연결선 (수직 직하강 -> 수평 이동 -> 당사자로 수직 직하강)
+                p_mid_y = py - 0.25
+                ax.plot([0, 0], [py, p_mid_y], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
+                ax.plot([0, cx], [p_mid_y, p_mid_y], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
+                ax.plot([cx, cx], [p_mid_y, cy + 0.1], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
 
-        # 3. 자녀 세대 스마트 정렬 (1자 직선/T자선 스마트 전환)
+        # 3. 자녀 세대 스마트 직각/수직 배치
         if children:
             chy = -0.38
             branch_y = -0.08
@@ -398,8 +404,6 @@ else:
                     family_groups.append({"type": "single", "child": ch, "child_idx": ch_idx})
 
             group_count = len(family_groups)
-            
-            # 단일 자녀일 때는 부부선 중심(parent_mid_x) 수직 직하강 위치로 맞춤
             parent_mid_x = (cx + (sx if spouse else (coh_x if cohabitants else cx))) / 2
             
             if group_count == 1:
@@ -447,16 +451,15 @@ else:
                             ax.plot([grx, grx], [chy - 0.2, gcy + 0.1], color='#2D3436', lw=1.2, zorder=1)
                             if gc.get('is_cohabit'): cohabit_coords.append((grx, gcy))
 
-            # [핵심] 자녀선 가계선 그리기 (1명이면 수직 1자선, 2명이상이면 T자 수평선)
-            real_ch_xs = [child_coords_map[k] for k in sorted(child_coords_map.keys())]
-
+            # [사선 완전 제거] 자녀선 가계선 출력 (수직 1자선 또는 직각 T자선)
             if group_count == 1:
-                # 꺾임 없이 부부선 중앙에서 자녀선으로 수직 직하강
-                single_ch_x = real_ch_xs[0]
-                ax.plot([parent_mid_x, single_ch_x], [cy - 0.1, chy + 0.1], color='#2D3436', lw=1.3, zorder=1)
+                target_gx = group_xs[0]
+                # 부부선 중앙에서 그룹 센터(target_gx)로 정확한 수직 직하강
+                ax.plot([target_gx, target_gx], [cy - 0.1, chy + 0.1], color='#2D3436', lw=1.3, zorder=1)
             else:
-                # 2개 그룹 이상일 때는 기존 T자 가계선
+                # 2개 그룹 이상일 때는 부부선 중앙 직하강 -> 수평 정렬 -> 수직 연결
                 ax.plot([parent_mid_x, parent_mid_x], [cy - 0.1, branch_y], color='#2D3436', lw=1.3, zorder=1)
+                real_ch_xs = [child_coords_map[k] for k in sorted(child_coords_map.keys())]
                 ax.plot([real_ch_xs[0], real_ch_xs[-1]], [branch_y, branch_y], color='#2D3436', lw=1.3, zorder=1)
 
                 for ch_idx, ch in enumerate(children):
