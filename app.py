@@ -14,7 +14,7 @@ def load_korean_font():
     font_path = "NanumGothic.ttf"
     if not os.path.exists(font_path):
         url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
-        urllib.request.urlretrieve(url, font_path)
+        urllib.request.urllibretrieve(url, font_path)
     fm.fontManager.addfont(font_path)
     return fm.FontProperties(fname=font_path).get_name()
 
@@ -24,7 +24,7 @@ plt.rcParams['axes.unicode_minus'] = False
 
 st.set_page_config(page_title="사례관리 스마트 생태도/가계도 생성기", layout="wide")
 
-# 상단 여백 최소화 패딩 적용 (타이틀 완전 제거 후 스크롤 없이 바로 피팅)
+# 상단 여백 최소화 패딩 적용
 st.markdown("""
 <style>
     .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
@@ -94,7 +94,6 @@ if selected_tool == "🌳 사례관리 생태도":
             st.session_state.nodes.pop(i)
             st.rerun()
 
-    # 체계 박스가 원 밖으로 나가지 않도록 반지름(radii) 정밀 수축
     def calculate_positions_ecomap(node_list, is_official):
         positions = {}
         count = len(node_list)
@@ -104,11 +103,11 @@ if selected_tool == "🌳 사례관리 생태도":
         else: start_angle, end_angle = -np.pi * 0.35, np.pi * 0.35
 
         if count <= 4:
-            radii = [0.72] * count  # 원 내부로 완전 안착되도록 반지름 축소 (0.85 -> 0.72)
+            radii = [0.75] * count
             angles = np.linspace(start_angle, end_angle, count + 2)[1:-1] if count > 1 else [(start_angle + end_angle)/2]
         else:
             half = (count + 1) // 2
-            radii = [0.65] * half + [0.82] * (count - half)
+            radii = [0.68] * half + [0.85] * (count - half)
             angles_inner = np.linspace(start_angle, end_angle, half + 2)[1:-1]
             angles_outer = np.linspace(start_angle, end_angle, (count - half) + 2)[1:-1]
             angles = list(angles_inner) + list(angles_outer)
@@ -134,35 +133,38 @@ if selected_tool == "🌳 사례관리 생태도":
         ax.add_patch(plt.Circle((0, 0), circle_r, color='#B2BEC3', fill=False, linestyle='-', linewidth=1.2))
         ax.plot([0, 0], [-circle_r, circle_r], color='#B2BEC3', linestyle='--', linewidth=1.5, zorder=1)
 
-        bbox_official = dict(boxstyle="round,pad=0.4", fc="#E3F2FD", ec="#1E88E5", lw=1.6)
-        bbox_unofficial = dict(boxstyle="round,pad=0.4", fc="#E8F5E9", ec="#43A047", lw=1.6)
+        bbox_official = dict(boxstyle="round,pad=0.35", fc="#E3F2FD", ec="#1E88E5", lw=1.6)
+        bbox_unofficial = dict(boxstyle="round,pad=0.35", fc="#E8F5E9", ec="#43A047", lw=1.6)
 
         ax.text(-0.52, circle_r, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10.5, weight='bold'), ha='center', va='center', color='#0D47A1', zorder=2, bbox=bbox_official)
         ax.text(0.52, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10.5, weight='bold'), ha='center', va='center', color='#1B5E20', zorder=2, bbox=bbox_unofficial)
 
-        ax.scatter(0, 0, s=2000, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.0, zorder=2)
-        ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3)
+        # 중앙 원
+        ax.scatter(0, 0, s=1800, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.0, zorder=2)
+        ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=9.5, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3)
 
+        # 체계 노드 상자 (폰트 크기 7.5pt, 패딩 pad=0.3으로 콤팩트하게 축소)
         def draw_node_box(n_list, bg_color, border_color):
             for n in n_list:
                 x, y = pos[n['name']]
                 full_text = f"{n['name']}\n({n['role']})" if n.get('role') else f"{n['name']}"
-                bbox_props = dict(boxstyle="round,pad=0.4", fc=bg_color, ec=border_color, lw=1.4)
-                ax.text(x, y, full_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8.5, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3, bbox=bbox_props, linespacing=1.2)
+                bbox_props = dict(boxstyle="round,pad=0.3", fc=bg_color, ec=border_color, lw=1.3)
+                ax.text(x, y, full_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3, bbox=bbox_props, linespacing=1.2)
 
         draw_node_box(official, "#E3F2FD", "#90CAF9")
         draw_node_box(unofficial, "#E8F5E9", "#A5D6A7")
 
+        # 화살표 연결 (축소된 노드 크기에 딱 맞게 shrink 조정)
         for n in nodes:
             target_x, target_y = pos[n['name']]
             lw = 2.4 if "강" in n['strength'] else (1.0 if "약" in n['strength'] else 1.5)
             style = 'dashed' if "약" in n['strength'] else 'solid'
             color = '#000000' if "강" in n['strength'] else ('#636E72' if "약" in n['strength'] else '#2D3436')
 
-            if "체계 ➔ 대상자" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "->", 32, 28
-            elif "대상자 ➔ 체계" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (0, 0), (target_x, target_y), "->", 28, 32
-            elif "쌍방향" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "<->", 32, 28
-            else: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "-", 32, 28
+            if "체계 ➔ 대상자" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "->", 20, 22
+            elif "대상자 ➔ 체계" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (0, 0), (target_x, target_y), "->", 22, 20
+            elif "쌍방향" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "<->", 20, 22
+            else: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "-", 20, 22
 
             arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=sA, shrinkB=sB)
             ax.annotate("", xy=end_pt, xytext=start_pt, arrowprops=arrow, zorder=4)
@@ -228,10 +230,10 @@ else:
         children = [m for m in members if "자녀" in m['relation']]
 
         def draw_person(x, y, name, age, gender, is_alive, is_target=False):
-            box_s = 0.28
+            box_s = 0.24  # 기호 사이즈 슬림화
             color = '#FFEAA7' if is_target else ('#E3F2FD' if gender == '남성' else '#FCE4EC')
             edge_c = '#FDCB6E' if is_target else ('#1976D2' if gender == '남성' else '#C2185B')
-            lw = 2.5 if is_target else 1.8
+            lw = 2.2 if is_target else 1.6
 
             if gender == '남성':
                 rect = patches.Rectangle((x - box_s/2, y - box_s/2), box_s, box_s, facecolor=color, edgecolor=edge_c, linewidth=lw, zorder=4)
@@ -241,11 +243,11 @@ else:
                 ax.add_patch(circle)
 
             if not is_alive:
-                ax.plot([x - box_s/2.5, x + box_s/2.5], [y - box_s/2.5, y + box_s/2.5], color='#D63031', lw=2, zorder=5)
-                ax.plot([x - box_s/2.5, x + box_s/2.5], [y + box_s/2.5, y - box_s/2.5], color='#D63031', lw=2, zorder=5)
+                ax.plot([x - box_s/2.5, x + box_s/2.5], [y - box_s/2.5, y + box_s/2.5], color='#D63031', lw=1.8, zorder=5)
+                ax.plot([x - box_s/2.5, x + box_s/2.5], [y + box_s/2.5, y - box_s/2.5], color='#D63031', lw=1.8, zorder=5)
 
             disp_txt = f"{name}\n({age}세)" if is_alive else f"{name}\n(사망)"
-            ax.text(x, y - box_s/2 - 0.1, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'),
+            ax.text(x, y - box_s/2 - 0.08, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'),
                     ha='center', va='top', color='#2D3436', zorder=5)
 
         cx, cy = (0, 0.1) if not spouse else (-0.45, 0.1)
@@ -257,9 +259,9 @@ else:
             draw_person(sx, sy, sp['name'], sp['age'], sp['gender'], sp['is_alive'])
             line_style = '-' if sp['rel_type'] != '소원/불화' else '--'
             color = '#D63031' if sp['rel_type'] == '소원/불화' else '#2D3436'
-            ax.plot([cx + 0.14, sx - 0.14], [cy, sy], color=color, linestyle=line_style, lw=2, zorder=2)
+            ax.plot([cx + 0.12, sx - 0.12], [cy, sy], color=color, linestyle=line_style, lw=2, zorder=2)
             if sp['rel_type'] == '밀접/친밀':
-                ax.plot([cx + 0.14, sx - 0.14], [cy + 0.03, sy + 0.03], color='#1976D2', lw=2, zorder=2)
+                ax.plot([cx + 0.12, sx - 0.12], [cy + 0.03, sy + 0.03], color='#1976D2', lw=2, zorder=2)
 
         if parents:
             py = 0.9
@@ -272,11 +274,11 @@ else:
             if mother: draw_person(p_mx, py, mother[0]['name'], mother[0]['age'], mother[0]['gender'], mother[0]['is_alive'])
 
             if father and mother:
-                ax.plot([p_fx + 0.14, p_mx - 0.14], [py, py], color='#B2BEC3', linestyle='--', lw=1.5, zorder=1)
+                ax.plot([p_fx + 0.12, p_mx - 0.12], [py, py], color='#B2BEC3', linestyle='--', lw=1.5, zorder=1)
                 ax.plot([0, 0], [py, py - 0.3], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
-                ax.plot([0, cx], [py - 0.3, cy + 0.14], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
-            elif father: ax.plot([p_fx, cx], [py - 0.14, cy + 0.14], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
-            elif mother: ax.plot([p_mx, cx], [py - 0.14, cy + 0.14], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
+                ax.plot([0, cx], [py - 0.3, cy + 0.12], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
+            elif father: ax.plot([p_fx, cx], [py - 0.12, cy + 0.12], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
+            elif mother: ax.plot([p_mx, cx], [py - 0.12, cy + 0.12], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
 
         if children:
             chy = -0.85
@@ -291,7 +293,7 @@ else:
             for idx, ch in enumerate(children):
                 chx = ch_xs[idx]
                 draw_person(chx, chy, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
-                ax.plot([chx, chx], [branch_y, chy + 0.14], color='#2D3436', lw=1.5, zorder=1)
+                ax.plot([chx, chx], [branch_y, chy + 0.12], color='#2D3436', lw=1.5, zorder=1)
 
         ax.text(0, -1.3, "□ 남성   ○ 여성   [색상/굵은선] 당사자   [X] 사망   ═ 밀접   --- 불화", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#636E72')
         
