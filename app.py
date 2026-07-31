@@ -28,37 +28,51 @@ st.markdown("""
 <style>
     .main-title { font-size: 1.5rem; font-weight: bold; color: #2C3E50; margin-bottom: 0.5rem; }
     .block-container { padding-top: 1rem; padding-bottom: 1rem; }
-    /* 차트 중앙 정렬 */
-    .stPlotlyChart, .stImage, div[data-testid="stImage"] { display: flex; justify-content: center; }
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="main-title">📊 사례관리 디지털 도구 (생태도 & 가계도)</div>', unsafe_allow_html=True)
 
-# 메인 탭 구성
-tab1, tab2 = st.tabs(["🌳 사례관리 생태도(Eco-Map)", "👨‍👩‍👧‍👦 스마트 가계도(Genogram)"])
+# 세션 상태 초기화 (생태도)
+if "client_name" not in st.session_state:
+    st.session_state.client_name = "당사자"
 
-# ==========================================
-# [TAB 1] 생태도 생성기
-# ==========================================
-with tab1:
-    if "client_name" not in st.session_state:
-        st.session_state.client_name = "당사자"
+if "nodes" not in st.session_state:
+    st.session_state.nodes = [
+        {"name": "장기요양", "role": "요양보호사 파견", "type": "공식체계", "strength": "강함", "direction": "체계 ➔ 대상자"},
+        {"name": "방문진료", "role": "월1회 방문진료", "type": "공식체계", "strength": "강함", "direction": "대상자 ➔ 체계"},
+        {"name": "보건소", "role": "맞춤형 방문건강", "type": "공식체계", "strength": "보통", "direction": "체계 ➔ 대상자"},
+        {"name": "노인맞춤돌봄", "role": "안부확인", "type": "공식체계", "strength": "보통", "direction": "체계 ➔ 대상자"},
+        {"name": "오래된 친구", "role": "정서적 지지", "type": "비공식체계", "strength": "강함", "direction": "쌍방향 (↔)"},
+        {"name": "경로당", "role": "여가 이용", "type": "비공식체계", "strength": "약함", "direction": "대상자 ➔ 체계"}
+    ]
 
-    if "nodes" not in st.session_state:
-        st.session_state.nodes = [
-            {"name": "장기요양", "role": "요양보호사 파견", "type": "공식체계", "strength": "강함", "direction": "체계 ➔ 대상자"},
-            {"name": "방문진료", "role": "월1회 방문진료", "type": "공식체계", "strength": "강함", "direction": "대상자 ➔ 체계"},
-            {"name": "보건소", "role": "맞춤형 방문건강", "type": "공식체계", "strength": "보통", "direction": "체계 ➔ 대상자"},
-            {"name": "노인맞춤돌봄", "role": "안부확인", "type": "공식체계", "strength": "보통", "direction": "체계 ➔ 대상자"},
-            {"name": "오래된 친구", "role": "정서적 지지", "type": "비공식체계", "strength": "강함", "direction": "쌍방향 (↔)"},
-            {"name": "경로당", "role": "여가 이용", "type": "비공식체계", "strength": "약함", "direction": "대상자 ➔ 체계"}
-        ]
+# 세션 상태 초기화 (가계도)
+if "gen_client" not in st.session_state:
+    st.session_state.gen_client = {"name": "홍길동", "gender": "남성", "age": "72", "is_alive": True}
 
-    # 좌측 사이드바 입력 구성 (생태도)
+if "family_members" not in st.session_state:
+    st.session_state.family_members = [
+        {"relation": "부(아버지)", "name": "아버지", "gender": "남성", "age": "사망", "is_alive": False, "rel_type": "보통"},
+        {"relation": "모(어머니)", "name": "어머니", "gender": "여성", "age": "사망", "is_alive": False, "rel_type": "보통"},
+        {"relation": "배우자", "name": "배우자", "gender": "여성", "age": "68", "is_alive": True, "rel_type": "밀접/친밀"},
+        {"relation": "자녀", "name": "장남", "gender": "남성", "age": "45", "is_alive": True, "rel_type": "보통"},
+        {"relation": "자녀", "name": "장녀", "gender": "여성", "age": "42", "is_alive": True, "rel_type": "소원/불화"}
+    ]
+
+# -------------------------------------------------------------
+# 사이드바 최상단: 도구 선택 메뉴 (입력창과 차트를 동기화)
+# -------------------------------------------------------------
+st.sidebar.header("📌 도구 선택")
+selected_tool = st.sidebar.radio("작성할 도구를 선택하세요", ["🌳 사례관리 생태도", "👨‍👩‍👧‍👦 스마트 가계도"])
+st.sidebar.markdown("---")
+
+# =============================================================
+# [MODE 1] 생태도 모드
+# =============================================================
+if selected_tool == "🌳 사례관리 생태도":
     st.sidebar.header("🌳 [생태도] 정보 입력")
     st.session_state.client_name = st.sidebar.text_input("중앙 대상자 이름", value=st.session_state.client_name, key="eco_client")
-    st.sidebar.markdown("---")
     
     with st.sidebar.form("add_node_form"):
         st.subheader("➕ 체계 추가")
@@ -90,11 +104,11 @@ with tab1:
         else: start_angle, end_angle = -np.pi * 0.35, np.pi * 0.35
 
         if count <= 4:
-            radii = [0.82] * count
+            radii = [0.85] * count
             angles = np.linspace(start_angle, end_angle, count + 2)[1:-1] if count > 1 else [(start_angle + end_angle)/2]
         else:
             half = (count + 1) // 2
-            radii = [0.72] * half + [0.95] * (count - half)
+            radii = [0.75] * half + [0.98] * (count - half)
             angles_inner = np.linspace(start_angle, end_angle, half + 2)[1:-1]
             angles_outer = np.linspace(start_angle, end_angle, (count - half) + 2)[1:-1]
             angles = list(angles_inner) + list(angles_outer)
@@ -103,9 +117,8 @@ with tab1:
             positions[n['name']] = (radii[idx] * np.cos(angles[idx]), radii[idx] * np.sin(angles[idx]))
         return positions
 
-    # 한 화면에 쏙 들어오도록 컴팩트 스케일(4.8 x 4.8)로 축소
     def draw_pretty_ecomap(nodes, client_name):
-        fig, ax = plt.subplots(figsize=(4.8, 4.8), dpi=200)
+        fig, ax = plt.subplots(figsize=(5.5, 5.5), dpi=200)
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
@@ -117,18 +130,18 @@ with tab1:
         pos.update(calculate_positions_ecomap(official, is_official=True))
         pos.update(calculate_positions_ecomap(unofficial, is_official=False))
 
-        circle_r = 1.08
+        circle_r = 1.05
         ax.add_patch(plt.Circle((0, 0), circle_r, color='#B2BEC3', fill=False, linestyle='-', linewidth=1.2))
         ax.plot([0, 0], [-circle_r, circle_r], color='#B2BEC3', linestyle='--', linewidth=1.5, zorder=1)
 
-        bbox_official = dict(boxstyle="round,pad=0.35", fc="#E3F2FD", ec="#1E88E5", lw=1.6)
-        bbox_unofficial = dict(boxstyle="round,pad=0.35", fc="#E8F5E9", ec="#43A047", lw=1.6)
+        bbox_official = dict(boxstyle="round,pad=0.4", fc="#E3F2FD", ec="#1E88E5", lw=1.6)
+        bbox_unofficial = dict(boxstyle="round,pad=0.4", fc="#E8F5E9", ec="#43A047", lw=1.6)
 
-        ax.text(-0.52, circle_r, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=11, weight='bold'), ha='center', va='center', color='#0D47A1', zorder=2, bbox=bbox_official)
-        ax.text(0.52, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=11, weight='bold'), ha='center', va='center', color='#1B5E20', zorder=2, bbox=bbox_unofficial)
+        ax.text(-0.52, circle_r, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10.5, weight='bold'), ha='center', va='center', color='#0D47A1', zorder=2, bbox=bbox_official)
+        ax.text(0.52, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10.5, weight='bold'), ha='center', va='center', color='#1B5E20', zorder=2, bbox=bbox_unofficial)
 
         ax.scatter(0, 0, s=2200, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.0, zorder=2)
-        ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10.5, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3)
+        ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3)
 
         def draw_node_box(n_list, bg_color, border_color):
             for n in n_list:
@@ -154,14 +167,15 @@ with tab1:
             arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=sA, shrinkB=sB)
             ax.annotate("", xy=end_pt, xytext=start_pt, arrowprops=arrow, zorder=4)
 
-        ax.text(0, -1.25, "↔ 쌍방향·강함     ➔ 일방향·보통     ---> 점선·약함", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#2D3436')
-        ax.set_xlim(-1.35, 1.35)
-        ax.set_ylim(-1.35, 1.35)
+        ax.text(0, -1.35, "↔ 쌍방향·강함     ➔ 일방향·보통     ---> 점선·약함", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#2D3436')
+        
+        ax.set_xlim(-1.55, 1.55)
+        ax.set_ylim(-1.55, 1.55)
         plt.axis("off")
         plt.tight_layout()
         return fig
 
-    # 스크린 피팅 렌더링
+    # 메인 차트 출력
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
     st.pyplot(fig1, use_container_width=False)
 
@@ -169,24 +183,10 @@ with tab1:
     fig1.savefig(buf1, format="png", bbox_inches='tight', dpi=300)
     st.download_button(label="💾 생태도 고화질 이미지 다운로드 (PNG)", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png")
 
-# ==========================================
-# [TAB 2] 스마트 가계도 생성기
-# ==========================================
-with tab2:
-    if "gen_client" not in st.session_state:
-        st.session_state.gen_client = {"name": "홍길동", "gender": "남성", "age": "72", "is_alive": True}
-
-    if "family_members" not in st.session_state:
-        st.session_state.family_members = [
-            {"relation": "부(아버지)", "name": "아버지", "gender": "남성", "age": "사망", "is_alive": False, "rel_type": "보통"},
-            {"relation": "모(어머니)", "name": "어머니", "gender": "여성", "age": "사망", "is_alive": False, "rel_type": "보통"},
-            {"relation": "배우자", "name": "배우자", "gender": "여성", "age": "68", "is_alive": True, "rel_type": "밀접/친밀"},
-            {"relation": "자녀", "name": "장남", "gender": "남성", "age": "45", "is_alive": True, "rel_type": "보통"},
-            {"relation": "자녀", "name": "장녀", "gender": "여성", "age": "42", "is_alive": True, "rel_type": "소원/불화"}
-        ]
-
-    # 좌측 사이드바 입력 구성 (가계도)
-    st.sidebar.markdown("---")
+# =============================================================
+# [MODE 2] 가계도 모드
+# =============================================================
+else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
     gc_name = st.sidebar.text_input("당사자 이름", value=st.session_state.gen_client['name'], key="gen_name")
     gc_gender = st.sidebar.radio("당사자 성별", ["남성", "여성"], index=0 if st.session_state.gen_client['gender'] == "남성" else 1, horizontal=True, key="gen_gender")
@@ -218,9 +218,8 @@ with tab2:
             st.session_state.family_members.pop(idx)
             st.rerun()
 
-    # 가계도 그리기 함수 (4.8 x 4.8 스케일)
     def draw_pretty_genogram(client, members):
-        fig, ax = plt.subplots(figsize=(4.8, 4.8), dpi=200)
+        fig, ax = plt.subplots(figsize=(5.5, 5.5), dpi=200)
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
@@ -295,13 +294,14 @@ with tab2:
                 ax.plot([chx, chx], [branch_y, chy + 0.14], color='#2D3436', lw=1.5, zorder=1)
 
         ax.text(0, -1.35, "□ 남성   ○ 여성   [색상/굵은선] 당사자   [X] 사망   ═ 밀접   --- 불화", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#636E72')
-        ax.set_xlim(-1.35, 1.35)
-        ax.set_ylim(-1.35, 1.35)
+        
+        ax.set_xlim(-1.55, 1.55)
+        ax.set_ylim(-1.55, 1.55)
         plt.axis("off")
         plt.tight_layout()
         return fig
 
-    # 스크린 피팅 렌더링
+    # 메인 차트 출력
     fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members)
     st.pyplot(fig2, use_container_width=False)
 
