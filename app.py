@@ -223,12 +223,11 @@ if selected_tool == "🌳 사례관리 생태도":
     st.download_button(label="💾 생태도 고화질 이미지 다운로드 (PNG)", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png")
 
 # =============================================================
-# [MODE 2] 가계도 모드 (동적 배치 및 노드 겹침 완벽 해결)
+# [MODE 2] 가계도 모드 (레이아웃 시각 정밀 보정)
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
     
-    # 당사자 정보
     gc_name = st.sidebar.text_input("당사자 이름", value=st.session_state.gen_client['name'], key="gen_name")
     gc_gender = st.sidebar.radio("당사자 성별", ["남성", "여성"], index=0 if st.session_state.gen_client['gender'] == "남성" else 1, horizontal=True, key="gen_gender")
     gc_age = st.sidebar.text_input("당사자 나이", value=st.session_state.gen_client['age'], key="gen_age")
@@ -264,7 +263,6 @@ else:
             st.session_state.family_members.pop(idx)
             st.rerun()
 
-    # 정밀 가계도 그리기 (동적 가로 정렬 알고리즘 적용)
     def draw_pretty_genogram(client, members):
         fig, ax = plt.subplots(figsize=(5.5, 5.5), dpi=200)
         fig.patch.set_facecolor('#FFFFFF')
@@ -370,7 +368,7 @@ else:
             ax.text(mid_x, cy + 0.08, "동거인", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'),
                     ha='center', va='center', color='#2E7D32', zorder=4, bbox=lbl_bbox)
 
-        # 2. 부모님 (1세대)
+        # 2. 부모님 (1세대) - 부모님이 실제로 등록된 경우에만 연결선 그리기
         if parents:
             py = 0.95
             father = [p for p in parents if "부" in p['relation']]
@@ -389,56 +387,77 @@ else:
                 ax.plot([0, 0], [py, py - 0.25], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
                 ax.plot([0, cx], [py - 0.25, cy + 0.1], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
 
-        # 3. 자녀 세대 동적 가로 분배 계산 (노드 겹침 완전 해결)
+        # 3. 자녀 세대 정밀 그룹 배치 (부부 그룹 묶음 정렬)
         if children:
             chy = -0.38
             branch_y = -0.08
             
-            # 자녀 세대의 전체 항목 구조 파악 (자녀 + 사위/며느리)
-            c_items = []
-            for ch_idx, ch in enumerate(children):
-                c_items.append({"type": "child", "data": ch, "child_idx": ch_idx})
-                # 첫 번째 자녀와 사위/며느리 연결
-                if ch_idx == 0 and in_laws:
-                    c_items.append({"type": "in_law", "data": in_laws[0], "child_idx": ch_idx})
+            # 자녀 세대 노드 그룹 정의
+            # 구조: [{"type": "pair", "child": ch, "in_law": il}, {"type": "single", "child": ch}]
+            family_groups = []
+            used_in_laws = set()
 
-            total_c_count = len(c_items)
-            
-            # 전체 너비(-1.0 ~ 1.0) 안에서 균등 분배
-            if total_c_count == 1:
-                item_xs = [0.0]
-            else:
-                item_xs = list(np.linspace(-0.85, 0.85, total_c_count))
+            for ch_idx, ch in enumerate(children):
+                if ch_idx == 0 and in_laws:
+                    family_groups.append({"type": "pair", "child": ch, "in_law": in_laws[0], "child_idx": ch_idx})
+                    used_in_laws.add(0)
+                else:
+                    family_groups.append({"type": "single", "child": ch, "child_idx": ch_idx})
+
+            group_count = len(family_groups)
+            group_xs = list(np.linspace(-0.65, 0.65, group_count)) if group_count > 1 else [0.0]
 
             child_coords_map = {}
-            in_law_coord = None
+            parent_mid_x = (cx + (sx if spouse else (coh_x if cohabitants else cx))) / 2
 
-            # 배치 및 출력
-            for idx, item in enumerate(c_items):
-                ix = item_xs[idx]
-                idata = item['data']
-                draw_person(ix, chy, idata['name'], idata['age'], idata['gender'], idata['is_alive'])
-                
-                if idata.get('is_cohabit'):
-                    cohabit_coords.append((ix, chy))
+            for g_idx, group in enumerate(family_groups):
+                gx = group_xs[g_idx]
+                ch = group['child']
 
-                if item['type'] == "child":
-                    child_coords_map[item['child_idx']] = ix
+                if group['type'] == 'single':
+                    draw_person(gx, chy, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
+                    child_coords_map[group['child_idx']] = gx
+                    if ch.get('is_cohabit'): cohabit_coords.append((gx, chy))
                 else:
-                    in_law_coord = ix
+                    # 부부 묶음 (자녀 + 사위/며느리 붙여서 배치)
+                    il = group['in_law']
+                    ch_x = gx - 0.16
+                    il_x = gx + 0.16
+                    
+                    draw_person(ch_x, chy, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
+                    draw_person(il_x, chy, il['name'], il['age'], il['gender'], il['is_alive'])
+                    
+                    ax.plot([ch_x + 0.1, il_x - 0.1], [chy, chy], color='#2D3436', lw=1.2, zorder=2)
+                    
+                    child_coords_map[group['child_idx']] = ch_x
+                    if ch.get('is_cohabit'): cohabit_coords.append((ch_x, chy))
+                    if il.get('is_cohabit'): cohabit_coords.append((il_x, chy))
 
-            # 부모에서 자녀 세대로 내려오는 가계선 그리기
-            mid_x = (cx + (sx if spouse else (coh_x if cohabitants else cx))) / 2
-            ax.plot([mid_x, mid_x], [cy - 0.1, branch_y], color='#2D3436', lw=1.3, zorder=1)
+                    # 4. 손자/손녀 (4세대)
+                    if grand_children:
+                        gcy = -0.92
+                        gc_mid = (ch_x + il_x) / 2
+                        ax.plot([gc_mid, gc_mid], [chy, chy - 0.2], color='#2D3436', lw=1.2, zorder=1)
+                        
+                        gc_xs = list(np.linspace(gc_mid - 0.22, gc_mid + 0.22, len(grand_children))) if len(grand_children) > 1 else [gc_mid]
+                        if len(grand_children) > 1:
+                            ax.plot([gc_xs[0], gc_xs[-1]], [chy - 0.2, chy - 0.2], color='#2D3436', lw=1.2, zorder=1)
 
-            # 자녀들 x좌표만 추출하여 가로선 생성
+                        for g_idx, gc in enumerate(grand_children):
+                            grx = gc_xs[g_idx]
+                            draw_person(grx, gcy, gc['name'], gc['age'], gc['gender'], gc['is_alive'])
+                            ax.plot([grx, grx], [chy - 0.2, gcy + 0.1], color='#2D3436', lw=1.2, zorder=1)
+                            if gc.get('is_cohabit'): cohabit_coords.append((grx, gcy))
+
+            # T자 가계선 생성
+            ax.plot([parent_mid_x, parent_mid_x], [cy - 0.1, branch_y], color='#2D3436', lw=1.3, zorder=1)
+
             real_ch_xs = [child_coords_map[k] for k in sorted(child_coords_map.keys())]
             if len(real_ch_xs) > 1:
                 ax.plot([real_ch_xs[0], real_ch_xs[-1]], [branch_y, branch_y], color='#2D3436', lw=1.3, zorder=1)
             elif len(real_ch_xs) == 1:
-                ax.plot([mid_x, real_ch_xs[0]], [branch_y, branch_y], color='#2D3436', lw=1.3, zorder=1)
+                ax.plot([parent_mid_x, real_ch_xs[0]], [branch_y, branch_y], color='#2D3436', lw=1.3, zorder=1)
 
-            # 세로 수직선 및 관계 표시
             for ch_idx, ch in enumerate(children):
                 chx = child_coords_map[ch_idx]
                 ch_rel = ch.get('rel_type', '보통')
@@ -467,27 +486,6 @@ else:
                 else:
                     ax.plot([chx, chx], [branch_y, chy + 0.1], color='#2D3436', lw=1.3, zorder=1)
 
-            # 첫 자녀와 사위/며느리 실선 연결
-            if 0 in child_coords_map and in_law_coord is not None:
-                ch0_x = child_coords_map[0]
-                ax.plot([ch0_x + 0.1, in_law_coord - 0.1], [chy, chy], color='#2D3436', lw=1.2, zorder=2)
-
-                # 4. 손자/손녀 (4세대)
-                if grand_children:
-                    gcy = -0.92
-                    gc_mid = (ch0_x + in_law_coord) / 2
-                    ax.plot([gc_mid, gc_mid], [chy, chy - 0.2], color='#2D3436', lw=1.2, zorder=1)
-                    
-                    gc_xs = list(np.linspace(gc_mid - 0.25, gc_mid + 0.25, len(grand_children))) if len(grand_children) > 1 else [gc_mid]
-                    if len(grand_children) > 1:
-                        ax.plot([gc_xs[0], gc_xs[-1]], [chy - 0.2, chy - 0.2], color='#2D3436', lw=1.2, zorder=1)
-
-                    for g_idx, gc in enumerate(grand_children):
-                        gx = gc_xs[g_idx]
-                        draw_person(gx, gcy, gc['name'], gc['age'], gc['gender'], gc['is_alive'])
-                        ax.plot([gx, gx], [chy - 0.2, gcy + 0.1], color='#2D3436', lw=1.2, zorder=1)
-                        if gc.get('is_cohabit'): cohabit_coords.append((gx, gcy))
-
         # 5. 반려동물
         if pets:
             pet_y = -0.38 if not children else -0.92
@@ -502,7 +500,7 @@ else:
             xs = [c[0] for c in cohabit_coords]
             ys = [c[1] for c in cohabit_coords]
             min_x, max_x = min(xs) - 0.22, max(xs) + 0.22
-            min_y, max_y = min(ys) - 0.22, max(ys) + 0.22  # 하단 글씨가 넘치지 않게 여백 확장
+            min_y, max_y = min(ys) - 0.22, max(ys) + 0.22
             
             width = max_x - min_x
             height = max_y - min_y
