@@ -116,14 +116,18 @@ if selected_tool == "🌳 사례관리 생태도":
             positions[n['name']] = (radii[idx] * np.cos(angles[idx]), radii[idx] * np.sin(angles[idx]))
         return positions
 
-    # 상자 테두리와 직선의 교차점 수학적 정확 계산 함수
-    def get_box_intersection(center_x, center_y, width, height, target_x, target_y):
+    # 상자 테두리 마진(0.012)을 반영한 정밀 교차점 함수
+    def get_box_intersection_precise(center_x, center_y, width, height, target_x, target_y):
         dx = target_x - center_x
         dy = target_y - center_y
         if dx == 0 and dy == 0: return center_x, center_y
         
-        scale_x = (width / 2) / abs(dx) if dx != 0 else float('inf')
-        scale_y = (height / 2) / abs(dy) if dy != 0 else float('inf')
+        # 테두리 라인 오프셋 보정
+        w_margin = width / 2 + 0.012
+        h_margin = height / 2 + 0.012
+        
+        scale_x = w_margin / abs(dx) if dx != 0 else float('inf')
+        scale_y = h_margin / abs(dy) if dy != 0 else float('inf')
         scale = min(scale_x, scale_y)
         return center_x + dx * scale, center_y + dy * scale
 
@@ -151,13 +155,13 @@ if selected_tool == "🌳 사례관리 생태도":
         ax.text(-0.52, circle_r, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10.5, weight='bold'), ha='center', va='center', color='#0D47A1', zorder=2, bbox=bbox_official)
         ax.text(0.52, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10.5, weight='bold'), ha='center', va='center', color='#1B5E20', zorder=2, bbox=bbox_unofficial)
 
-        # 중앙 원 (반지름 r=0.14)
+        # 중앙 원
         center_r = 0.14
         ax.scatter(0, 0, s=1800, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.0, zorder=2)
         ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=9.5, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3)
 
-        # 노드 상자 규격 (가로 0.34 / 세로 0.13 슬림 직사각형)
-        box_w, box_h = 0.34, 0.13
+        # 노드 상자 규격 (가로 0.38 / 세로 0.13 여유있는 황금비율 직사각형)
+        box_w, box_h = 0.38, 0.13
 
         def draw_node_box(n_list, bg_color, border_color):
             for n in n_list:
@@ -165,7 +169,7 @@ if selected_tool == "🌳 사례관리 생태도":
                 
                 rect = patches.FancyBboxPatch(
                     (x - box_w/2, y - box_h/2), box_w, box_h,
-                    boxstyle="round,pad=0.01,rounding_size=0.02",
+                    boxstyle="round,pad=0.01,rounding_size=0.025",
                     facecolor=bg_color, edgecolor=border_color, linewidth=1.2, zorder=3
                 )
                 ax.add_patch(rect)
@@ -182,22 +186,21 @@ if selected_tool == "🌳 사례관리 생태도":
         draw_node_box(official, "#E3F2FD", "#90CAF9")
         draw_node_box(unofficial, "#E8F5E9", "#A5D6A7")
 
-        # 화살표 그리기 (수학적 겉면 정밀 안착 방식)
+        # 화살표 그리기 (1px 오차 없는 완벽 밀착 연산)
         for n in nodes:
             x, y = pos[n['name']]
-            lw = 2.2 if "강" in n['strength'] else (1.0 if "약" in n['strength'] else 1.4)
+            lw = 2.0 if "강" in n['strength'] else (1.0 if "약" in n['strength'] else 1.3)
             style = 'dashed' if "약" in n['strength'] else 'solid'
             color = '#000000' if "강" in n['strength'] else ('#636E72' if "약" in n['strength'] else '#2D3436')
 
-            # 1. 박스 겉면 교차점 계산
-            bx, by = get_box_intersection(x, y, box_w, box_h, 0, 0)
+            # 박스 정밀 교차점
+            bx, by = get_box_intersection_precise(x, y, box_w, box_h, 0, 0)
             
-            # 2. 중앙 원 겉면 교차점 계산
+            # 중앙 원 정밀 교차점
             angle = np.arctan2(y, x)
-            cx = center_r * np.cos(angle)
-            cy = center_r * np.sin(angle)
+            cx = (center_r + 0.01) * np.cos(angle)
+            cy = (center_r + 0.01) * np.sin(angle)
 
-            # 방향별 출발/도착점 설정
             if "체계 ➔ 대상자" in n['direction']:
                 p_from, p_to, a_style = (bx, by), (cx, cy), "->"
             elif "대상자 ➔ 체계" in n['direction']:
@@ -207,11 +210,11 @@ if selected_tool == "🌳 사례관리 생태도":
             else:
                 p_from, p_to, a_style = (bx, by), (cx, cy), "-"
 
-            # FancyArrowPatch를 이용해 딱 안착
+            # 날렵하고 또렷한 화살표 머리(mutation_scale=8.5)
             arrow_patch = patches.FancyArrowPatch(
                 p_from, p_to,
                 arrowstyle=a_style, linestyle=style, linewidth=lw,
-                color=color, mutation_scale=10, zorder=5
+                color=color, mutation_scale=8.5, zorder=5
             )
             ax.add_patch(arrow_patch)
 
