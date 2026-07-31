@@ -215,7 +215,6 @@ if selected_tool == "🌳 사례관리 생태도":
         plt.tight_layout(pad=0.0)
         return fig
 
-    # 우측 상단 다운로드 버튼 배치
     col_t1, col_t2 = st.columns([4, 1])
     col_t2.markdown("<div style='text-align: right;'>", unsafe_allow_html=True)
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
@@ -227,7 +226,7 @@ if selected_tool == "🌳 사례관리 생태도":
     st.pyplot(fig1, use_container_width=False)
 
 # =============================================================
-# [MODE 2] 가계도 모드 (우측 상단 다운로드 + 개별 동거 버블 영역)
+# [MODE 2] 가계도 모드 (우측 상단 다운로드 + 비동거 자녀 자동 제외 독립 동거 영역)
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
@@ -509,11 +508,11 @@ else:
                 px = pet_x - (p_idx * 0.28)
                 draw_person(px, pet_y, pt['name'], pt['age'], pt['gender'], pt['is_alive'])
                 if pt.get('is_cohabit'): 
-                    cohabit_coords.append((px, pet_y))
+                    cohabit_points.append((px, pet_y))
 
         # 6. [핵심 수정: 비동거 가족 완전 제외, 동거인들만 각각 독립적인 둥근 버블로 개별 감싸기]
-        if len(cohabit_coords) > 0:
-            pts = np.array(cohabit_coords)
+        if len(cohabit_points) > 0:
+            pts = np.array(cohabit_points)
             
             # X좌표 기준으로 거리가 멀리 떨어진 동거인들(예: 왼쪽의 부부와 오른쪽의 차남)을 각각 분리하여 독립된 버블 생성
             sorted_pts = pts[np.argsort(pts[:, 0])]
