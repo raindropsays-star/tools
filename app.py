@@ -6,6 +6,7 @@ import matplotlib.patches as patches
 import numpy as np
 import urllib.request
 import os
+import io
 
 # 1. 한글 폰트(나눔고딕) 자동 다운로드 및 적용
 @st.cache_resource
@@ -32,11 +33,15 @@ st.markdown("""
 
 st.markdown('<div class="main-title">📊 사례관리 디지털 도구 (생태도 & 가계도)</div>', unsafe_allow_html=True)
 
+# 공통 사이드바 (차트 크기 조절 옵션)
+st.sidebar.header("⚙️ 화면 및 차트 크기 설정")
+chart_size = st.sidebar.slider("🖼️ 차트 크기 조절 (스크린샷용)", min_value=3.5, max_value=7.5, value=5.0, step=0.5)
+
 # 메인 탭 구성
 tab1, tab2 = st.tabs(["🌳 사례관리 생태도(Eco-Map)", "👨‍👩‍👧‍👦 스마트 가계도(Genogram)"])
 
 # ==========================================
-# [TAB 1] 생태도 생성기 (기존 완성본)
+# [TAB 1] 생태도 생성기
 # ==========================================
 with tab1:
     if "client_name" not in st.session_state:
@@ -52,7 +57,6 @@ with tab1:
             {"name": "경로당", "role": "여가 이용", "type": "비공식체계", "strength": "약함", "direction": "대상자 ➔ 체계"}
         ]
 
-    # 위치 계산 함수
     def calculate_positions_ecomap(node_list, is_official):
         positions = {}
         count = len(node_list)
@@ -75,8 +79,8 @@ with tab1:
             positions[n['name']] = (radii[idx] * np.cos(angles[idx]), radii[idx] * np.sin(angles[idx]))
         return positions
 
-    def draw_pretty_ecomap(nodes, client_name):
-        fig, ax = plt.subplots(figsize=(6.5, 6.5), dpi=200)
+    def draw_pretty_ecomap(nodes, client_name, size):
+        fig, ax = plt.subplots(figsize=(size, size), dpi=200)
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
@@ -132,10 +136,15 @@ with tab1:
         plt.tight_layout()
         return fig
 
-    col1, col2 = st.columns([2.5, 1])
+    col1, col2 = st.columns([2.2, 1])
     with col1:
-        fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
+        fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name, chart_size)
         st.pyplot(fig1)
+
+        # 이미지 다운로드 버튼
+        buf1 = io.BytesIO()
+        fig1.savefig(buf1, format="png", bbox_inches='tight', dpi=300)
+        st.download_button(label="💾 생태도 고화질 이미지 다운로드", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png")
 
     with col2:
         st.subheader("👤 대상자 및 체계 관리")
@@ -160,7 +169,7 @@ with tab1:
                 st.rerun()
 
 # ==========================================
-# [TAB 2] 스마트 가계도 생성기 (신규 기능)
+# [TAB 2] 스마트 가계도 생성기
 # ==========================================
 with tab2:
     if "gen_client" not in st.session_state:
@@ -175,42 +184,36 @@ with tab2:
             {"relation": "자녀", "name": "장녀", "gender": "여성", "age": "42", "is_alive": True, "rel_type": "소원/불화"}
         ]
 
-    def draw_pretty_genogram(client, members):
-        fig, ax = plt.subplots(figsize=(7, 6.5), dpi=200)
+    def draw_pretty_genogram(client, members, size):
+        fig, ax = plt.subplots(figsize=(size, size), dpi=200)
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
-        # 층별 좌표 설정 (1세대: 부모 / 2세대: 본인&배우자 / 3세대: 자녀)
         parents = [m for m in members if "부" in m['relation'] or "모" in m['relation']]
         spouse = [m for m in members if "배우자" in m['relation']]
         children = [m for m in members if "자녀" in m['relation']]
 
-        # 1. 기호 그리기 함수 (남: 네모, 여: 원, 사망: X)
         def draw_person(x, y, name, age, gender, is_alive, is_target=False, rel_type="보통"):
-            size = 0.28
+            box_s = 0.28
             color = '#FFEAA7' if is_target else ('#E3F2FD' if gender == '남성' else '#FCE4EC')
             edge_c = '#FDCB6E' if is_target else ('#1976D2' if gender == '남성' else '#C2185B')
             lw = 2.5 if is_target else 1.8
 
             if gender == '남성':
-                rect = patches.Rectangle((x - size/2, y - size/2), size, size, facecolor=color, edgecolor=edge_c, linewidth=lw, zorder=3)
+                rect = patches.Rectangle((x - box_s/2, y - box_s/2), box_s, box_s, facecolor=color, edgecolor=edge_c, linewidth=lw, zorder=3)
                 ax.add_patch(rect)
             else:
-                circle = patches.Circle((x, y), size/2, facecolor=color, edgecolor=edge_c, linewidth=lw, zorder=3)
+                circle = patches.Circle((x, y), box_s/2, facecolor=color, edgecolor=edge_c, linewidth=lw, zorder=3)
                 ax.add_patch(circle)
 
-            # 사망자 X 표시
             if not is_alive:
-                ax.plot([x - size/2.5, x + size/2.5], [y - size/2.5, y + size/2.5], color='#D63031', lw=2, zorder=4)
-                ax.plot([x - size/2.5, x + size/2.5], [y + size/2.5, y - size/2.5], color='#D63031', lw=2, zorder=4)
+                ax.plot([x - box_s/2.5, x + box_s/2.5], [y - box_s/2.5, y + box_s/2.5], color='#D63031', lw=2, zorder=4)
+                ax.plot([x - box_s/2.5, x + box_s/2.5], [y + box_s/2.5, y - box_s/2.5], color='#D63031', lw=2, zorder=4)
 
-            # 이름 및 나이
             disp_txt = f"{name}\n({age}세)" if is_alive else f"{name}\n(사망)"
-            ax.text(x, y - size/2 - 0.12, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8.5, weight='bold'),
+            ax.text(x, y - box_s/2 - 0.12, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8.5, weight='bold'),
                     ha='center', va='top', color='#2D3436')
 
-        # 좌표 배치
-        # 2세대 (당사자 & 배우자)
         cx, cy = (0, 0) if not spouse else (-0.4, 0)
         draw_person(cx, cy, client['name'], client['age'], client['gender'], client['is_alive'], is_target=True)
 
@@ -218,28 +221,23 @@ with tab2:
             sx, sy = (0.4, 0)
             sp = spouse[0]
             draw_person(sx, sy, sp['name'], sp['age'], sp['gender'], sp['is_alive'], rel_type=sp['rel_type'])
-            # 혼인선 (두 사람 연결)
             line_style = '-' if sp['rel_type'] != '소원/불화' else '--'
             color = '#D63031' if sp['rel_type'] == '소원/불화' else '#2D3436'
             ax.plot([cx + 0.14, sx - 0.14], [cy, sy], color=color, linestyle=line_style, lw=2, zorder=2)
             if sp['rel_type'] == '밀접/친밀':
                 ax.plot([cx + 0.14, sx - 0.14], [cy + 0.03, sy + 0.03], color='#1976D2', lw=2, zorder=2)
 
-        # 1세대 (부모)
         if parents:
             py = 0.8
             p_xs = np.linspace(-0.5, 0.5, len(parents))
             for idx, p in enumerate(parents):
                 px = p_xs[idx]
                 draw_person(px, py, p['name'], p['age'], p['gender'], p['is_alive'])
-                # 부모 연결선
                 ax.plot([px, cx], [py - 0.14, cy + 0.14], color='#B2BEC3', linestyle=':', lw=1.5, zorder=1)
 
-        # 3세대 (자녀)
         if children:
             chy = -0.8
             ch_xs = np.linspace(-0.6, 0.6, len(children))
-            # 자녀 연결 가지선
             mid_x = (cx + sx)/2 if spouse else cx
             ax.plot([mid_x, mid_x], [cy - 0.14, cy - 0.45], color='#2D3436', lw=1.5, zorder=1)
             ax.plot([ch_xs[0], ch_xs[-1]], [cy - 0.45, cy - 0.45], color='#2D3436', lw=1.5, zorder=1)
@@ -249,20 +247,21 @@ with tab2:
                 draw_person(chx, chy, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
                 ax.plot([chx, chx], [cy - 0.45, chy + 0.14], color='#2D3436', lw=1.5, zorder=1)
 
-        # 하단 범례
-        legend_txt = "□ 남성   ○ 여성   [색상/굵은선] 당사자   [X] 사망   ═ 밀접   --- 불화"
-        ax.text(0, -1.35, legend_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#636E72')
-
+        ax.text(0, -1.35, "□ 남성   ○ 여성   [색상/굵은선] 당사자   [X] 사망   ═ 밀접   --- 불화", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#636E72')
         ax.set_xlim(-1.4, 1.4)
         ax.set_ylim(-1.4, 1.4)
         plt.axis("off")
         plt.tight_layout()
         return fig
 
-    g_col1, g_col2 = st.columns([2.5, 1])
+    g_col1, g_col2 = st.columns([2.2, 1])
     with g_col1:
-        fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members)
+        fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members, chart_size)
         st.pyplot(fig2)
+
+        buf2 = io.BytesIO()
+        fig2.savefig(buf2, format="png", bbox_inches='tight', dpi=300)
+        st.download_button(label="💾 가계도 고화질 이미지 다운로드", data=buf2.getvalue(), file_name=f"가계도_{st.session_state.gen_client['name']}.png", mime="image/png")
 
     with g_col2:
         st.subheader("👤 당사자(본인) 정보 설정")
