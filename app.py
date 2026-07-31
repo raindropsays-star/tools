@@ -103,11 +103,11 @@ if selected_tool == "🌳 사례관리 생태도":
         else: start_angle, end_angle = -np.pi * 0.35, np.pi * 0.35
 
         if count <= 4:
-            radii = [0.78] * count
+            radii = [0.76] * count
             angles = np.linspace(start_angle, end_angle, count + 2)[1:-1] if count > 1 else [(start_angle + end_angle)/2]
         else:
             half = (count + 1) // 2
-            radii = [0.70] * half + [0.88] * (count - half)
+            radii = [0.68] * half + [0.86] * (count - half)
             angles_inner = np.linspace(start_angle, end_angle, half + 2)[1:-1]
             angles_outer = np.linspace(start_angle, end_angle, (count - half) + 2)[1:-1]
             angles = list(angles_inner) + list(angles_outer)
@@ -141,70 +141,52 @@ if selected_tool == "🌳 사례관리 생태도":
         ax.text(0.52, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10.5, weight='bold'), ha='center', va='center', color='#1B5E20', zorder=2, bbox=bbox_unofficial)
 
         # 중앙 원
-        center_r = 0.14
         ax.scatter(0, 0, s=1800, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.0, zorder=2)
         ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=9.5, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3)
 
-        # 노드 박스 치수 (가로 w=0.36, 세로 h=0.12 로 대폭 납작하게 만듦)
-        box_w, box_h = 0.36, 0.12
-
+        # 체계 노드 상자 (자연스러운 내장 bbox 자동 피팅 구조로 복원)
         def draw_node_box(n_list, bg_color, border_color):
             for n in n_list:
                 x, y = pos[n['name']]
                 
-                # 가로로 길고 세로로 슬림한 패치
-                rect = patches.FancyBboxPatch(
-                    (x - box_w/2, y - box_h/2), box_w, box_h,
-                    boxstyle="round,pad=0.015,rounding_size=0.025",
-                    facecolor=bg_color, edgecolor=border_color, linewidth=1.2, zorder=3
-                )
-                ax.add_patch(rect)
-
-                # 납작해진 상자에 딱 맞는 텍스트 높이 정렬
+                # 콤팩트한 슬림 상자 스타일
+                bbox_props = dict(boxstyle="round,pad=0.3", fc=bg_color, ec=border_color, lw=1.3)
+                
                 if n.get('role'):
-                    ax.text(x, y + 0.02, n['name'], fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.2, weight='bold'),
-                            ha='center', va='center', color='#2D3436', zorder=4)
-                    ax.text(x, y - 0.022, f"({n['role']})", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=5.2),
-                            ha='center', va='center', color='#636E72', zorder=4)
+                    # 체계명 6.8pt / 역할 5.0pt 차등 적용한 통합 문자열
+                    full_text = f"{n['name']}\n({n['role']})"
                 else:
-                    ax.text(x, y, n['name'], fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.2, weight='bold'),
-                            ha='center', va='center', color='#2D3436', zorder=4)
+                    full_text = f"{n['name']}"
+
+                # 단일 text 객체로 자연스러운 행간(linespacing=1.2) 형성
+                ax.text(x, y, full_text, 
+                        fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'),
+                        ha='center', va='center', color='#2D3436', zorder=3, bbox=bbox_props, linespacing=1.25)
 
         draw_node_box(official, "#E3F2FD", "#90CAF9")
         draw_node_box(unofficial, "#E8F5E9", "#A5D6A7")
 
-        # 화살표 접점 정밀 계산
+        # 화살표 연결 (자동 피팅 박스 테두리에 맞춰 오프셋 12pt/20pt 설정)
         for n in nodes:
-            x, y = pos[n['name']]
+            target_x, target_y = pos[n['name']]
             lw = 2.2 if "강" in n['strength'] else (1.0 if "약" in n['strength'] else 1.4)
             style = 'dashed' if "약" in n['strength'] else 'solid'
             color = '#000000' if "강" in n['strength'] else ('#636E72' if "약" in n['strength'] else '#2D3436')
 
-            angle = np.arctan2(y, x)
-            
-            # 중앙 원 경계점
-            cx_edge = center_r * np.cos(angle)
-            cy_edge = center_r * np.sin(angle)
+            if "체계 ➔ 대상자" in n['direction']: 
+                p_start, p_end, arr_style = (target_x, target_y), (0, 0), "->"
+                sA, sB = 16, 20
+            elif "대상자 ➔ 체계" in n['direction']: 
+                p_start, p_end, arr_style = (0, 0), (target_x, target_y), "->"
+                sA, sB = 20, 16
+            elif "쌍방향" in n['direction']: 
+                p_start, p_end, arr_style = (target_x, target_y), (0, 0), "<->"
+                sA, sB = 16, 20
+            else: 
+                p_start, p_end, arr_style = (target_x, target_y), (0, 0), "-"
+                sA, sB = 16, 20
 
-            # 슬림해진 직사각형 박스 경계 교차점 계산
-            cos_a, sin_a = np.cos(angle), np.sin(angle)
-            scale_x = (box_w/2) / abs(cos_a) if abs(cos_a) > 1e-5 else 999
-            scale_y = (box_h/2) / abs(sin_a) if abs(sin_a) > 1e-5 else 999
-            scale = min(scale_x, scale_y)
-            
-            bx_edge = x - scale * cos_a
-            by_edge = y - scale * sin_a
-
-            if "체계 ➔ 대상자" in n['direction']:
-                p_start, p_end, arr_style = (bx_edge, by_edge), (cx_edge, cy_edge), "->"
-            elif "대상자 ➔ 체계" in n['direction']:
-                p_start, p_end, arr_style = (cx_edge, cy_edge), (bx_edge, by_edge), "->"
-            elif "쌍방향" in n['direction']:
-                p_start, p_end, arr_style = (bx_edge, by_edge), (cx_edge, cy_edge), "<->"
-            else:
-                p_start, p_end, arr_style = (bx_edge, by_edge), (cx_edge, cy_edge), "-"
-
-            arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=0, shrinkB=0)
+            arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=sA, shrinkB=sB)
             ax.annotate("", xy=p_end, xytext=p_start, arrowprops=arrow, zorder=5)
 
         ax.text(0, -1.3, "↔ 쌍방향·강함     ➔ 일방향·보통     ---> 점선·약함", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#2D3436')
