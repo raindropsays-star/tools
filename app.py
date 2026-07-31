@@ -24,14 +24,13 @@ plt.rcParams['axes.unicode_minus'] = False
 
 st.set_page_config(page_title="사례관리 스마트 생태도/가계도 생성기", layout="wide")
 
+# 상단 여백 최소화 패딩 적용 (타이틀 완전 제거 후 스크롤 없이 바로 피팅)
 st.markdown("""
 <style>
-    .main-title { font-size: 1.5rem; font-weight: bold; color: #2C3E50; margin-bottom: 0.5rem; }
-    .block-container { padding-top: 1rem; padding-bottom: 1rem; }
+    .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+    header { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
-
-st.markdown('<div class="main-title">📊 사례관리 디지털 도구 (생태도 & 가계도)</div>', unsafe_allow_html=True)
 
 # 세션 상태 초기화 (생태도)
 if "client_name" not in st.session_state:
@@ -61,10 +60,10 @@ if "family_members" not in st.session_state:
     ]
 
 # -------------------------------------------------------------
-# 사이드바 최상단: 도구 선택 메뉴 (입력창과 차트를 동기화)
+# 사이드바 최상단: 도구 선택 메뉴
 # -------------------------------------------------------------
-st.sidebar.header("📌 도구 선택")
-selected_tool = st.sidebar.radio("작성할 도구를 선택하세요", ["🌳 사례관리 생태도", "👨‍👩‍👧‍👦 스마트 가계도"])
+st.sidebar.header("📌 작성 도구 선택")
+selected_tool = st.sidebar.radio("원하시는 도구를 선택하세요", ["🌳 사례관리 생태도", "👨‍👩‍👧‍👦 스마트 가계도"])
 st.sidebar.markdown("---")
 
 # =============================================================
@@ -95,6 +94,7 @@ if selected_tool == "🌳 사례관리 생태도":
             st.session_state.nodes.pop(i)
             st.rerun()
 
+    # 체계 박스가 원 밖으로 나가지 않도록 반지름(radii) 정밀 수축
     def calculate_positions_ecomap(node_list, is_official):
         positions = {}
         count = len(node_list)
@@ -104,11 +104,11 @@ if selected_tool == "🌳 사례관리 생태도":
         else: start_angle, end_angle = -np.pi * 0.35, np.pi * 0.35
 
         if count <= 4:
-            radii = [0.85] * count
+            radii = [0.72] * count  # 원 내부로 완전 안착되도록 반지름 축소 (0.85 -> 0.72)
             angles = np.linspace(start_angle, end_angle, count + 2)[1:-1] if count > 1 else [(start_angle + end_angle)/2]
         else:
             half = (count + 1) // 2
-            radii = [0.75] * half + [0.98] * (count - half)
+            radii = [0.65] * half + [0.82] * (count - half)
             angles_inner = np.linspace(start_angle, end_angle, half + 2)[1:-1]
             angles_outer = np.linspace(start_angle, end_angle, (count - half) + 2)[1:-1]
             angles = list(angles_inner) + list(angles_outer)
@@ -118,7 +118,7 @@ if selected_tool == "🌳 사례관리 생태도":
         return positions
 
     def draw_pretty_ecomap(nodes, client_name):
-        fig, ax = plt.subplots(figsize=(5.5, 5.5), dpi=200)
+        fig, ax = plt.subplots(figsize=(5.2, 5.2), dpi=200)
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
@@ -140,14 +140,14 @@ if selected_tool == "🌳 사례관리 생태도":
         ax.text(-0.52, circle_r, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10.5, weight='bold'), ha='center', va='center', color='#0D47A1', zorder=2, bbox=bbox_official)
         ax.text(0.52, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10.5, weight='bold'), ha='center', va='center', color='#1B5E20', zorder=2, bbox=bbox_unofficial)
 
-        ax.scatter(0, 0, s=2200, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.0, zorder=2)
+        ax.scatter(0, 0, s=2000, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.0, zorder=2)
         ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3)
 
         def draw_node_box(n_list, bg_color, border_color):
             for n in n_list:
                 x, y = pos[n['name']]
                 full_text = f"{n['name']}\n({n['role']})" if n.get('role') else f"{n['name']}"
-                bbox_props = dict(boxstyle="round,pad=0.45", fc=bg_color, ec=border_color, lw=1.4)
+                bbox_props = dict(boxstyle="round,pad=0.4", fc=bg_color, ec=border_color, lw=1.4)
                 ax.text(x, y, full_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8.5, weight='bold'), ha='center', va='center', color='#2D3436', zorder=3, bbox=bbox_props, linespacing=1.2)
 
         draw_node_box(official, "#E3F2FD", "#90CAF9")
@@ -159,23 +159,23 @@ if selected_tool == "🌳 사례관리 생태도":
             style = 'dashed' if "약" in n['strength'] else 'solid'
             color = '#000000' if "강" in n['strength'] else ('#636E72' if "약" in n['strength'] else '#2D3436')
 
-            if "체계 ➔ 대상자" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "->", 35, 30
-            elif "대상자 ➔ 체계" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (0, 0), (target_x, target_y), "->", 30, 35
-            elif "쌍방향" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "<->", 35, 30
-            else: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "-", 35, 30
+            if "체계 ➔ 대상자" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "->", 32, 28
+            elif "대상자 ➔ 체계" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (0, 0), (target_x, target_y), "->", 28, 32
+            elif "쌍방향" in n['direction']: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "<->", 32, 28
+            else: start_pt, end_pt, arr_style, sA, sB = (target_x, target_y), (0, 0), "-", 32, 28
 
             arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=sA, shrinkB=sB)
             ax.annotate("", xy=end_pt, xytext=start_pt, arrowprops=arrow, zorder=4)
 
-        ax.text(0, -1.35, "↔ 쌍방향·강함     ➔ 일방향·보통     ---> 점선·약함", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#2D3436')
+        ax.text(0, -1.3, "↔ 쌍방향·강함     ➔ 일방향·보통     ---> 점선·약함", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#2D3436')
         
-        ax.set_xlim(-1.55, 1.55)
-        ax.set_ylim(-1.55, 1.55)
+        ax.set_xlim(-1.45, 1.45)
+        ax.set_ylim(-1.45, 1.45)
         plt.axis("off")
         plt.tight_layout()
         return fig
 
-    # 메인 차트 출력
+    # 차트 출력
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
     st.pyplot(fig1, use_container_width=False)
 
@@ -219,7 +219,7 @@ else:
             st.rerun()
 
     def draw_pretty_genogram(client, members):
-        fig, ax = plt.subplots(figsize=(5.5, 5.5), dpi=200)
+        fig, ax = plt.subplots(figsize=(5.2, 5.2), dpi=200)
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
@@ -293,15 +293,15 @@ else:
                 draw_person(chx, chy, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
                 ax.plot([chx, chx], [branch_y, chy + 0.14], color='#2D3436', lw=1.5, zorder=1)
 
-        ax.text(0, -1.35, "□ 남성   ○ 여성   [색상/굵은선] 당사자   [X] 사망   ═ 밀접   --- 불화", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#636E72')
+        ax.text(0, -1.3, "□ 남성   ○ 여성   [색상/굵은선] 당사자   [X] 사망   ═ 밀접   --- 불화", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#636E72')
         
-        ax.set_xlim(-1.55, 1.55)
-        ax.set_ylim(-1.55, 1.55)
+        ax.set_xlim(-1.45, 1.45)
+        ax.set_ylim(-1.45, 1.45)
         plt.axis("off")
         plt.tight_layout()
         return fig
 
-    # 메인 차트 출력
+    # 차트 출력
     fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members)
     st.pyplot(fig2, use_container_width=False)
 
