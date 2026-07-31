@@ -89,17 +89,18 @@ for i, node in enumerate(st.session_state.nodes):
         st.session_state.nodes.pop(i)
         st.rerun()
 
-# 위치 계산 함수 (타이이트한 원 구도를 위해 배치 반지름 보정)
+# 완전 대칭 위치 계산 함수
 def calculate_positions(node_list, is_official):
     positions = {}
     count = len(node_list)
     if count == 0:
         return positions
 
+    # Y축(세로 점선) 기준 좌우 완벽 대칭 각도
     if is_official:
-        start_angle, end_angle = np.pi * 0.62, np.pi * 1.38
+        start_angle, end_angle = np.pi * 0.65, np.pi * 1.35
     else:
-        start_angle, end_angle = -np.pi * 0.38, np.pi * 0.38
+        start_angle, end_angle = -np.pi * 0.35, np.pi * 0.35
 
     if count <= 4:
         radii = [0.82] * count
@@ -120,7 +121,7 @@ def calculate_positions(node_list, is_official):
 
     return positions
 
-# 생태도 시각화 함수 (외부 원을 타이트하게 축소)
+# 생태도 시각화 함수 (대칭성 강화)
 def draw_pretty_ecomap(nodes, client_name):
     fig, ax = plt.subplots(figsize=(6.5, 6.5), dpi=200)
     fig.patch.set_facecolor('#FFFFFF')
@@ -137,21 +138,21 @@ def draw_pretty_ecomap(nodes, client_name):
     pos.update(calculate_positions(official, is_official=True))
     pos.update(calculate_positions(unofficial, is_official=False))
 
-    # 1. 외곽 원 (반지름을 1.25 -> 1.08로 타이트하게 축소)
+    # 1. 외곽 원 (정중앙 0,0 좌표)
     circle_r = 1.08
     bg_circle = plt.Circle((0, 0), circle_r, color='#B2BEC3', fill=False, linestyle='-', linewidth=1.2)
     ax.add_patch(bg_circle)
 
-    # 2. 중앙 세로 수직 점선
+    # 2. 중앙 세로 수직 점선 (정확히 x=0 선상)
     ax.plot([0, 0], [-circle_r, circle_r], color='#B2BEC3', linestyle='--', linewidth=1.5, zorder=1)
 
-    # 3. 상단 타이틀 (원 테두리에 바짝 밀착)
+    # 3. 상단 타이틀 (좌우 완벽 대칭 좌표 x=-0.52, x=+0.52)
     bbox_official = dict(boxstyle="round,pad=0.4", fc="#E3F2FD", ec="#1E88E5", lw=1.8)
     bbox_unofficial = dict(boxstyle="round,pad=0.4", fc="#E8F5E9", ec="#43A047", lw=1.8)
 
-    ax.text(-0.48, circle_r, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=12.5, weight='bold'),
+    ax.text(-0.52, circle_r, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=12.5, weight='bold'),
             ha='center', va='center', color='#0D47A1', zorder=2, bbox=bbox_official)
-    ax.text(0.48, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=12.5, weight='bold'),
+    ax.text(0.52, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=12.5, weight='bold'),
             ha='center', va='center', color='#1B5E20', zorder=2, bbox=bbox_unofficial)
 
     # 4. 중앙 대상자 노드
@@ -177,7 +178,7 @@ def draw_pretty_ecomap(nodes, client_name):
     draw_node_box(official, "#E3F2FD", "#90CAF9")
     draw_node_box(unofficial, "#E8F5E9", "#A5D6A7")
 
-    # 6. 화살표 연결 (타이트해진 구도에 맞춰 간격 세밀 조절)
+    # 6. 화살표 연결
     for n in nodes:
         target_x, target_y = pos[n['name']]
         
@@ -223,8 +224,9 @@ def draw_pretty_ecomap(nodes, client_name):
     ax.text(0, -1.25, legend_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8.5, weight='bold'),
             ha='center', va='center', color='#2D3436')
 
-    ax.set_xlim(-1.3, 1.3)
-    ax.set_ylim(-1.3, 1.3)
+    # 좌우 축 범위를 완전히 동일하게 대칭 설정 (-1.35 ~ +1.35)
+    ax.set_xlim(-1.35, 1.35)
+    ax.set_ylim(-1.35, 1.35)
     plt.axis("off")
     plt.tight_layout()
     return fig
@@ -243,5 +245,5 @@ with col2:
     st.markdown("---")
     st.markdown("""
     **개선 사항:**
-    - 외부 가이드 원의 크기를 타이트하게 축소하여 공백을 최소화했습니다.
+    - 중앙 수직선 기준으로 좌우 대칭성을 완벽하게 교정했습니다.
     """)
