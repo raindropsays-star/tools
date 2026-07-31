@@ -2,6 +2,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import matplotlib.patches as patches
+import matplotlib.path as mpath
 import numpy as np
 import urllib.request
 import os
@@ -23,9 +24,10 @@ plt.rcParams['axes.unicode_minus'] = False
 
 st.set_page_config(page_title="사례관리 스마트 생태도/가계도 생성기", layout="wide")
 
+# 상단 여백을 바짝 붙여 스크롤 없이 바로 보이도록 CSS 최적화
 st.markdown("""
 <style>
-    .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+    .block-container { padding-top: 0.1rem !important; padding-bottom: 0.1rem !important; }
     header { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
@@ -50,7 +52,7 @@ if "gen_client" not in st.session_state:
 
 if "family_members" not in st.session_state:
     st.session_state.family_members = [
-        {"relation": "배우자", "name": "배우자", "gender": "여성", "age": "68", "is_alive": True, "rel_type": "밀접/친밀", "is_cohabit": False},
+        {"relation": "배우자", "name": "배우자", "gender": "여성", "age": "70", "is_alive": True, "rel_type": "밀접/친밀", "is_cohabit": True},
         {"relation": "자녀", "name": "장남", "gender": "남성", "age": "45", "is_alive": True, "rel_type": "보통", "is_cohabit": False},
         {"relation": "사위/며느리", "name": "큰며느리", "gender": "여성", "age": "43", "is_alive": True, "rel_type": "보통", "is_cohabit": False},
         {"relation": "자녀", "name": "차남", "gender": "남성", "age": "44", "is_alive": True, "rel_type": "보통", "is_cohabit": True}
@@ -211,18 +213,18 @@ if selected_tool == "🌳 사례관리 생태도":
         ax.set_xlim(-1.45, 1.45)
         ax.set_ylim(-1.45, 1.45)
         plt.axis("off")
-        plt.tight_layout()
+        plt.tight_layout(pad=0.2)
         return fig
 
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
     st.pyplot(fig1, use_container_width=False)
 
     buf1 = io.BytesIO()
-    fig1.savefig(buf1, format="png", bbox_inches='tight', dpi=300)
+    fig1.savefig(buf1, format="png", bbox_inches='tight', pad_inches=0.1, dpi=300)
     st.download_button(label="💾 생태도 고화질 이미지 다운로드 (PNG)", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png")
 
 # =============================================================
-# [MODE 2] 가계도 모드 (통합 동거 영역 + 비동거 자녀 분리 배치 최적화)
+# [MODE 2] 가계도 모드 (상단 밀착 정렬 및 정밀 동거 영역 최적화)
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
@@ -263,7 +265,8 @@ else:
             st.rerun()
 
     def draw_pretty_genogram(client, members):
-        fig, ax = plt.subplots(figsize=(6.0, 6.0), dpi=200)
+        # 상단부터 바로 시작하도록 Y축 좌표계 및 캔버스 여백 타이트하게 설정
+        fig, ax = plt.subplots(figsize=(6.0, 5.8), dpi=200)
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
@@ -301,14 +304,14 @@ else:
             ax.text(x, y - box_s/2 - 0.07, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                     ha='center', va='top', color='#2D3436', zorder=5)
 
-        # 1. 당사자 및 배우자
-        cx, cy = (0, 0.25) if (not spouse and not cohabitants) else (-0.45, 0.25)
+        # 1. 당사자 및 배우자 위치 (상단 밀착 배치)
+        cx, cy = (0, 0.40) if (not spouse and not cohabitants) else (-0.45, 0.40)
         draw_person(cx, cy, client['name'], client['age'], client['gender'], client['is_alive'], is_target=True)
         if client.get('is_cohabit', True): 
             cohabit_coords.append((cx, cy))
 
         if spouse:
-            sx, sy = (0.45, 0.25)
+            sx, sy = (0.45, 0.40)
             sp = spouse[0]
             draw_person(sx, sy, sp['name'], sp['age'], sp['gender'], sp['is_alive'])
             if sp.get('is_cohabit', False): 
@@ -359,7 +362,7 @@ else:
 
         if cohabitants and not spouse:
             coh = cohabitants[0]
-            coh_x, coh_y = (0.45, 0.25)
+            coh_x, coh_y = (0.45, 0.40)
             draw_person(coh_x, coh_y, coh['name'], coh['age'], coh['gender'], coh['is_alive'])
             if coh.get('is_cohabit', True): 
                 cohabit_coords.append((coh_x, coh_y))
@@ -372,7 +375,7 @@ else:
 
         # 2. 부모님 (1세대)
         if parents:
-            py = 0.95
+            py = 1.05
             father = [p for p in parents if "부" in p['relation']]
             mother = [p for p in parents if "모" in p['relation']]
             p_fx, p_mx = -0.45, 0.45
@@ -388,16 +391,16 @@ else:
 
             if father and mother:
                 ax.plot([p_fx + 0.1, p_mx - 0.1], [py, py], color='#B2BEC3', linestyle='--', lw=1.2, zorder=1)
-                p_mid_y = py - 0.25
+                p_mid_y = py - 0.20
                 ax.plot([0, 0], [py, p_mid_y], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
                 ax.plot([0, cx], [p_mid_y, p_mid_y], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
                 ax.plot([cx, cx], [p_mid_y, cy + 0.1], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
 
-        # 3. 자녀 세대 가변 폭 배치
+        # 3. 자녀 세대 배치
         child_coords_map = {}
         if children:
-            chy = -0.38
-            branch_y = -0.05
+            chy = -0.20
+            branch_y = 0.10
             
             family_groups = []
             for ch_idx, ch in enumerate(children):
@@ -423,44 +426,39 @@ else:
                 ch = group['child']
 
                 if group['type'] == 'single':
-                    # [시각적 개선] 동거하는 자녀는 위쪽(y = -0.32)으로 살짝 단차를 두어 동거 영역에 자연스럽게 포용
-                    node_y = chy + 0.06 if ch.get('is_cohabit') else chy
-                    draw_person(gx, node_y, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
+                    draw_person(gx, chy, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
                     child_coords_map[group['child_idx']] = gx
                     if ch.get('is_cohabit'): 
-                        cohabit_coords.append((gx, node_y))
+                        cohabit_coords.append((gx, chy))
                 else:
                     il = group['in_law']
                     ch_x = gx - 0.15
                     il_x = gx + 0.15
                     
-                    c_y = chy + 0.06 if ch.get('is_cohabit') else chy
-                    i_y = chy + 0.06 if il.get('is_cohabit') else chy
-
-                    draw_person(ch_x, c_y, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
-                    draw_person(il_x, i_y, il['name'], il['age'], il['gender'], il['is_alive'])
+                    draw_person(ch_x, chy, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
+                    draw_person(il_x, chy, il['name'], il['age'], il['gender'], il['is_alive'])
                     
-                    ax.plot([ch_x + 0.09, il_x - 0.09], [c_y, i_y], color='#2D3436', lw=1.2, zorder=2)
+                    ax.plot([ch_x + 0.09, il_x - 0.09], [chy, chy], color='#2D3436', lw=1.2, zorder=2)
                     
                     child_coords_map[group['child_idx']] = ch_x
                     if ch.get('is_cohabit'): 
-                        cohabit_coords.append((ch_x, c_y))
+                        cohabit_coords.append((ch_x, chy))
                     if il.get('is_cohabit'): 
-                        cohabit_coords.append((il_x, i_y))
+                        cohabit_coords.append((il_x, chy))
 
                     if grand_children:
-                        gcy = -0.92
+                        gcy = -0.75
                         gc_mid = (ch_x + il_x) / 2
-                        ax.plot([gc_mid, gc_mid], [chy, chy - 0.2], color='#2D3436', lw=1.2, zorder=1)
+                        ax.plot([gc_mid, gc_mid], [chy, chy - 0.18], color='#2D3436', lw=1.2, zorder=1)
                         
                         gc_xs = list(np.linspace(gc_mid - 0.22, gc_mid + 0.22, len(grand_children))) if len(grand_children) > 1 else [gc_mid]
                         if len(grand_children) > 1:
-                            ax.plot([gc_xs[0], gc_xs[-1]], [chy - 0.2, chy - 0.2], color='#2D3436', lw=1.2, zorder=1)
+                            ax.plot([gc_xs[0], gc_xs[-1]], [chy - 0.18, chy - 0.18], color='#2D3436', lw=1.2, zorder=1)
 
                         for g_idx, gc in enumerate(grand_children):
                             grx = gc_xs[g_idx]
                             draw_person(grx, gcy, gc['name'], gc['age'], gc['gender'], gc['is_alive'])
-                            ax.plot([grx, grx], [chy - 0.2, gcy + 0.1], color='#2D3436', lw=1.2, zorder=1)
+                            ax.plot([grx, grx], [chy - 0.18, gcy + 0.1], color='#2D3436', lw=1.2, zorder=1)
                             if gc.get('is_cohabit'): 
                                 cohabit_coords.append((grx, gcy))
 
@@ -503,41 +501,60 @@ else:
 
         # 5. 반려동물
         if pets:
-            pet_y = -0.38 if not children else -0.92
+            pet_y = -0.20 if not children else -0.75
             pet_x = 1.10
             for p_idx, pt in enumerate(pets):
                 px = pet_x - (p_idx * 0.28)
-                p_y = pet_y + 0.06 if pt.get('is_cohabit') else pet_y
-                draw_person(px, p_y, pt['name'], pt['age'], pt['gender'], pt['is_alive'])
+                draw_person(px, pet_y, pt['name'], pt['age'], pt['gender'], pt['is_alive'])
                 if pt.get('is_cohabit'): 
-                    cohabit_points.append((px, p_y))
+                    cohabit_coords.append((px, pet_y))
 
-        # 6. [통합 동거 영역 버블 박스] 동거인들만 한데 감싸는 깔끔한 영역
+        # 6. [정밀 동거 영역 버블 박스] 동거인들만 정확히 감싸기
         if len(cohabit_coords) > 0:
             pts = np.array(cohabit_coords)
-            min_x, max_x = min(pts[:, 0]) - 0.22, max(pts[:, 0]) + 0.22
-            min_y, max_y = min(pts[:, 1]) - 0.20, max(pts[:, 1]) + 0.20
-            w, h = max_x - min_x, max_y - min_y
             
-            co_bubble = patches.FancyBboxPatch(
-                (min_x, min_y), w, h,
-                boxstyle="round,pad=0.08,rounding_size=0.15",
-                facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
-            )
-            ax.add_patch(co_bubble)
-            ax.text(min_x + 0.02, max_y + 0.02, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), color='#1B5E20', zorder=1)
+            # 동거인이 2명 이상이고, X축 거리가 멀어서(중간에 비동거인이 끼어있는 경우) 분리 감싸기 적용
+            if len(pts) >= 2 and (max(pts[:, 0]) - min(pts[:, 0]) > 0.8):
+                # 왼쪽 그룹과 오른쪽 그룹을 각각 나누어 버블 생성
+                left_pts = pts[pts[:, 0] < 0]
+                right_pts = pts[pts[:, 0] >= 0]
+                
+                for group_pts in [left_pts, right_pts]:
+                    if len(group_pts) > 0:
+                        min_x, max_x = min(group_pts[:, 0]) - 0.18, max(group_pts[:, 0]) + 0.18
+                        min_y, max_y = min(group_pts[:, 1]) - 0.18, max(group_pts[:, 1]) + 0.18
+                        w, h = max_x - min_x, max_y - min_y
+                        co_bubble = patches.FancyBboxPatch(
+                            (min_x, min_y), w, h,
+                            boxstyle="round,pad=0.08,rounding_size=0.15",
+                            facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
+                        )
+                        ax.add_patch(co_bubble)
+                ax.text(min(pts[:, 0]) - 0.15, max(pts[:, 1]) + 0.08, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), color='#1B5E20', zorder=1)
+            else:
+                min_x, max_x = min(pts[:, 0]) - 0.22, max(pts[:, 0]) + 0.22
+                min_y, max_y = min(pts[:, 1]) - 0.20, max(pts[:, 1]) + 0.20
+                w, h = max_x - min_x, max_y - min_y
+                
+                co_bubble = patches.FancyBboxPatch(
+                    (min_x, min_y), w, h,
+                    boxstyle="round,pad=0.08,rounding_size=0.15",
+                    facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
+                )
+                ax.add_patch(co_bubble)
+                ax.text(min_x + 0.02, max_y + 0.02, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), color='#1B5E20', zorder=1)
 
-        ax.text(0, -1.38, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#636E72')
+        ax.text(0, -1.25, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#636E72')
         
         ax.set_xlim(-1.60, 1.60)
-        ax.set_ylim(-1.45, 1.45)
+        ax.set_ylim(-1.30, 1.30)
         plt.axis("off")
-        plt.tight_layout()
+        plt.tight_layout(pad=0.1)
         return fig
 
     fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members)
     st.pyplot(fig2, use_container_width=False)
 
     buf2 = io.BytesIO()
-    fig2.savefig(buf2, format="png", bbox_inches='tight', dpi=300)
+    fig2.savefig(buf2, format="png", bbox_inches='tight', pad_inches=0.05, dpi=300)
     st.download_button(label="💾 가계도 고화질 이미지 다운로드 (PNG)", data=buf2.getvalue(), file_name=f"가계도_{st.session_state.gen_client['name']}.png", mime="image/png")
