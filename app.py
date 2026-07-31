@@ -144,7 +144,39 @@ def draw_pretty_ecomap(nodes, client_name):
     # 2. 중앙 세로 수직 점선
     ax.plot([0, 0], [-circle_r, circle_r], color='#B2BEC3', linestyle='--', linewidth=1.5, zorder=1)
 
-    # 3. 화살표 연결 (노드 박스보다 먼저 그려서 화살표 머리가 가려지지 않도록 zorder 조정)
+    # 3. 상단 타이틀
+    bbox_official = dict(boxstyle="round,pad=0.5", fc="#E3F2FD", ec="#1E88E5", lw=2)
+    bbox_unofficial = dict(boxstyle="round,pad=0.5", fc="#E8F5E9", ec="#43A047", lw=2)
+
+    ax.text(-0.55, circle_r, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=15, weight='bold'),
+            ha='center', va='center', color='#0D47A1', zorder=2, bbox=bbox_official)
+    ax.text(0.55, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=15, weight='bold'),
+            ha='center', va='center', color='#1B5E20', zorder=2, bbox=bbox_unofficial)
+
+    # 4. 중앙 대상자 노드 (zorder=2)
+    ax.scatter(0, 0, s=3600, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.5, zorder=2)
+    ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=14, weight='bold'),
+            ha='center', va='center', color='#2D3436', zorder=3)
+
+    # 5. 체계 노드 그리기 (zorder=2, 3)
+    def draw_node_box(n_list, bg_color, border_color):
+        for n in n_list:
+            x, y = pos[n['name']]
+            
+            if n.get('role'):
+                full_text = f"{n['name']}\n({n['role']})"
+            else:
+                full_text = f"{n['name']}"
+
+            bbox_props = dict(boxstyle="round,pad=0.6", fc=bg_color, ec=border_color, lw=1.8)
+            
+            ax.text(x, y, full_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10, weight='bold'),
+                    ha='center', va='center', color='#2D3436', zorder=3, bbox=bbox_props, linespacing=1.3)
+
+    draw_node_box(official, "#E3F2FD", "#90CAF9")
+    draw_node_box(unofficial, "#E8F5E9", "#A5D6A7")
+
+    # 6. 화살표 그리기 (zorder=4로 변경하여 원 및 상자 위로 노출 + shrinkB 오프셋 정밀 조정)
     for n in nodes:
         target_x, target_y = pos[n['name']]
         
@@ -178,41 +210,9 @@ def draw_pretty_ecomap(nodes, client_name):
             end_pt = (0, 0)
             arr_style = "-"
 
-        # shrinkA, shrinkB를 정밀하게 줄여서 화살표 머리가 박스 경계에 또렷이 드러나도록 수정
-        arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=38, shrinkB=22)
-        ax.annotate("", xy=end_pt, xytext=start_pt, arrowprops=arrow, zorder=2)
-
-    # 4. 상단 타이틀
-    bbox_official = dict(boxstyle="round,pad=0.5", fc="#E3F2FD", ec="#1E88E5", lw=2)
-    bbox_unofficial = dict(boxstyle="round,pad=0.5", fc="#E8F5E9", ec="#43A047", lw=2)
-
-    ax.text(-0.55, circle_r, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=15, weight='bold'),
-            ha='center', va='center', color='#0D47A1', zorder=5, bbox=bbox_official)
-    ax.text(0.55, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=15, weight='bold'),
-            ha='center', va='center', color='#1B5E20', zorder=5, bbox=bbox_unofficial)
-
-    # 5. 중앙 대상자 노드
-    ax.scatter(0, 0, s=3600, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.5, zorder=3)
-    ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=14, weight='bold'),
-            ha='center', va='center', color='#2D3436', zorder=4)
-
-    # 6. 체계 노드 그리기
-    def draw_node_box(n_list, bg_color, border_color):
-        for n in n_list:
-            x, y = pos[n['name']]
-            
-            if n.get('role'):
-                full_text = f"{n['name']}\n({n['role']})"
-            else:
-                full_text = f"{n['name']}"
-
-            bbox_props = dict(boxstyle="round,pad=0.6", fc=bg_color, ec=border_color, lw=1.8)
-            
-            ax.text(x, y, full_text, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10, weight='bold'),
-                    ha='center', va='center', color='#2D3436', zorder=5, bbox=bbox_props, linespacing=1.3)
-
-    draw_node_box(official, "#E3F2FD", "#90CAF9")
-    draw_node_box(unofficial, "#E8F5E9", "#A5D6A7")
+        # shrinkA: 체계 상자 쪽 여백, shrinkB: 중앙 당사자 원 쪽 여백(원 반지름에 딱 맞춰 42로 확장)
+        arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=38, shrinkB=42)
+        ax.annotate("", xy=end_pt, xytext=start_pt, arrowprops=arrow, zorder=4)
 
     # 하단 범례 표시
     legend_text = "↔ 쌍방향·강함     ➔ 일방향·보통     ---> 점선·약함"
@@ -239,5 +239,5 @@ with col2:
     st.markdown("---")
     st.markdown("""
     **개선 사항:**
-    - 쌍방향 화살표 머리가 네모 박스 바깥에 선명히 드러나도록 여백 처리를 수정했습니다.
+    - 중앙 원 테두리에 딱 맞춰 화살표 머리가 선명하게 드러나도록 레이어 및 오프셋을 수정했습니다.
     """)
