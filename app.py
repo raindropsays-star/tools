@@ -27,7 +27,7 @@ st.set_page_config(page_title="사례관리 스마트 생태도/가계도 생성
 # 상단 여백 원천 차단 CSS
 st.markdown("""
 <style>
-    .block-container { padding-top: 0rem !important; padding-bottom: 0rem !important; margin-top: -20px !important; }
+    .block-container { padding-top: 0rem !important; padding-bottom: 0rem !important; margin-top: -25px !important; }
     header { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
@@ -66,7 +66,7 @@ selected_tool = st.sidebar.radio("원하시는 도구를 선택하세요", ["�
 st.sidebar.markdown("---")
 
 # =============================================================
-# [MODE 1] 생태도 모드
+# [MODE 1] 생태도 모드 (상단 최상단 밀착 정렬)
 # =============================================================
 if selected_tool == "🌳 사례관리 생태도":
     st.sidebar.header("🌳 [생태도] 정보 입력")
@@ -213,18 +213,18 @@ if selected_tool == "🌳 사례관리 생태도":
         ax.set_xlim(-1.45, 1.45)
         ax.set_ylim(-1.45, 1.45)
         plt.axis("off")
-        plt.tight_layout(pad=0.1)
+        plt.tight_layout(pad=0.0)
         return fig
 
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
     st.pyplot(fig1, use_container_width=False)
 
     buf1 = io.BytesIO()
-    fig1.savefig(buf1, format="png", bbox_inches='tight', pad_inches=0.05, dpi=300)
+    fig1.savefig(buf1, format="png", bbox_inches='tight', pad_inches=0.02, dpi=300)
     st.download_button(label="💾 생태도 고화질 이미지 다운로드 (PNG)", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png")
 
 # =============================================================
-# [MODE 2] 가계도 모드 (화면 최상단 밀착 정렬 및 동거 영역 복원)
+# [MODE 2] 가계도 모드 (상단 밀착 + 비동거 자녀 자동 제외 유기적 동거 영역)
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
@@ -265,7 +265,6 @@ else:
             st.rerun()
 
     def draw_pretty_genogram(client, members):
-        # 캔버스 크기를 타이트하게 잡고 상단 밀착 배치를 위해 좌표계 세팅
         fig, ax = plt.subplots(figsize=(6.0, 4.8), dpi=200)
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
@@ -304,7 +303,7 @@ else:
             ax.text(x, y - box_s/2 - 0.07, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                     ha='center', va='top', color='#2D3436', zorder=5)
 
-        # 1. 당사자 및 배우자 (화면 맨 위로 바짝 끌어올림: Y = 0.85)
+        # 1. 당사자 및 배우자 (화면 맨 위: Y = 0.85)
         cx, cy = (0, 0.85) if (not spouse and not cohabitants) else (-0.45, 0.85)
         draw_person(cx, cy, client['name'], client['age'], client['gender'], client['is_alive'], is_target=True)
         if client.get('is_cohabit', True): 
@@ -373,7 +372,7 @@ else:
             ax.text(mid_x, cy + 0.08, "동거인", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                     ha='center', va='center', color='#2E7D32', zorder=4, bbox=lbl_bbox)
 
-        # 2. 부모님 (1세대 - 만약 있다면 당사자 위쪽)
+        # 2. 부모님 (1세대)
         if parents:
             py = 1.30
             father = [p for p in parents if "부" in p['relation']]
@@ -509,24 +508,60 @@ else:
                 if pt.get('is_cohabit'): 
                     cohabit_coords.append((px, pet_y))
 
-        # 6. [통합 유기적 동거 영역]
+        # 6. [핵심 수정: 비동거 가족 제외 정밀 유기적 다각형 동거 영역]
         if len(cohabit_coords) > 0:
             pts = np.array(cohabit_coords)
-            min_x, max_x = min(pts[:, 0]) - 0.22, max(pts[:, 0]) + 0.22
-            min_y, max_y = min(pts[:, 1]) - 0.20, max(pts[:, 1]) + 0.20
-            w, h = max_x - min_x, max_y - min_y
             
-            co_bubble = patches.FancyBboxPatch(
-                (min_x, min_y), w, h,
-                boxstyle="round,pad=0.08,rounding_size=0.15",
-                facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
-            )
-            ax.add_patch(co_bubble)
-            ax.text(min_x + 0.02, max_y + 0.02, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), color='#1B5E20', zorder=1)
+            # 오직 동거로 체크된 실제 인원들의 좌표만 기준삼아 부드러운 패치 생성
+            # 만약 거리가 먼 동거인들이 있다면 각각의 버블을 부드럽게 병합하는 유기적 패치 적용
+            x_coords = pts[:, 0]
+            y_coords = pts[:, 1]
+            
+            # 동거인들만의 최소/최대 바운딩을 구하되, 비동거 자녀(장남 등)의 X좌표(약 -0.65)와 겹치지 않게 타이트하게 조절
+            min_x, max_x = min(x_coords) - 0.18, max(x_coords) + 0.18
+            min_y, max_y = min(y_coords) - 0.18, max(y_coords) + 0.18
+            
+            # 만약 장남(비동거)이 왼쪽에 있고 홍길동/차남만 동거할 때, 장남의 영역(-0.65)을 침범하지 않도록 왼쪽 경계 방어
+            if min_x < -0.3 and max_x > 0.2:
+                # 중간에 비동거인이 껴있는 경우: 동거인들만 각각 감싸거나 유기적으로 우회하는 패스 생성
+                # 여기서는 비동거인(장남 X=-0.65 부근) 영역을 명확히 회피하도록 좌우 분리형 혹은 타이트한 둥근 사각형 다중 패치 적용
+                unique_x_groups = []
+                # X좌표 기준으로 가까운 사람들끼리 묶기
+                sorted_pts = pts[np.argsort(pts[:, 0])]
+                current_group = [sorted_pts[0]]
+                for pt in sorted_pts[1:]:
+                    if pt[0] - current_group[-1][0] < 0.6: # 가까운 거리면 한 그룹
+                        current_group.append(pt)
+                    else:
+                        unique_x_groups.append(np.array(current_group))
+                        current_group = [pt]
+                unique_x_groups.append(np.array(current_group))
+                
+                for g_pts in unique_x_groups:
+                    g_min_x, g_max_x = min(g_pts[:, 0]) - 0.16, max(g_pts[:, 0]) + 0.16
+                    g_min_y, g_max_y = min(g_pts[:, 1]) - 0.16, max(g_pts[:, 1]) + 0.16
+                    gw, gh = g_max_x - g_min_x, g_max_y - g_min_y
+                    
+                    co_bubble = patches.FancyBboxPatch(
+                        (g_min_x, g_min_y), gw, gh,
+                        boxstyle="round,pad=0.08,rounding_size=0.15",
+                        facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
+                    )
+                    ax.add_patch(co_bubble)
+                ax.text(min_x, max_y + 0.05, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), color='#1B5E20', zorder=1)
+            else:
+                w, h = max_x - min_x, max_y - min_y
+                co_bubble = patches.FancyBboxPatch(
+                    (min_x, min_y), w, h,
+                    boxstyle="round,pad=0.08,rounding_size=0.15",
+                    facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
+                )
+                ax.add_patch(co_bubble)
+                ax.text(min_x + 0.02, max_y + 0.02, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), color='#1B5E20', zorder=1)
 
         ax.text(0, -0.65, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#636E72')
         
-        # [상단 밀착 정렬] Y축 범위를 위쪽으로 바짝 붙여서 생성 (0.0 ~ 1.5 구간)
+        # [상단 밀착 정렬] Y축 범위를 더 위로 바짝 끌어올림 (0.0 ~ 1.5 구간)
         ax.set_xlim(-1.60, 1.60)
         ax.set_ylim(-0.75, 1.45)
         plt.axis("off")
