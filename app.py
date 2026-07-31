@@ -191,7 +191,7 @@ if selected_tool == "🌳 사례관리 생태도":
             bx, by = get_box_intersection_precise(x, y, box_w, box_h, 0, 0)
             
             angle = np.arctan2(y, x)
-            cx = (center_r + 0.01) np.cos(angle)
+            cx = (center_r + 0.01) * np.cos(angle) # 수정된 부분 (*)
             cy = (center_r + 0.01) * np.sin(angle)
 
             if "체계 ➔ 대상자" in n['direction']:
@@ -226,7 +226,7 @@ if selected_tool == "🌳 사례관리 생태도":
     st.download_button(label="💾 생태도 고화질 이미지 다운로드 (PNG)", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png")
 
 # =============================================================
-# [MODE 2] 가계도 모드 (순수 Numpy 기반 외곽선 동거 영역 및 가변 배치)
+# [MODE 2] 가계도 모드
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
@@ -502,7 +502,7 @@ else:
                 draw_person(px, pet_y, pt['name'], pt['age'], pt['gender'], pt['is_alive'])
                 if pt.get('is_cohabit'): cohabit_coords.append((px, pet_y))
 
-        # 6. [순수 Numpy 기반 외곽선] 동거인 영역 그리기 (외부 패키지 의존성 완전 제거)
+        # 6. 동거인 영역 그리기
         if len(cohabit_coords) > 0:
             pts = np.array(cohabit_coords)
             
@@ -516,7 +516,6 @@ else:
                 ax.add_patch(co_bubble)
                 ax.text(px - 0.16, py + 0.16, "🏠 동거 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'), color='#1B5E20', zorder=1)
             else:
-                # 순수 Numpy 연산을 이용한 외곽 바운딩 박스/버블 생성
                 min_x, max_x = min(pts[:, 0]) - 0.22, max(pts[:, 0]) + 0.22
                 min_y, max_y = min(pts[:, 1]) - 0.20, max(pts[:, 1]) + 0.20
                 w, h = max_x - min_x, max_y - min_y
