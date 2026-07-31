@@ -54,7 +54,9 @@ if "family_members" not in st.session_state:
         {"relation": "모(어머니)", "name": "어머니", "gender": "여성", "age": "사망", "is_alive": False, "rel_type": "보통", "is_cohabit": False},
         {"relation": "배우자", "name": "배우자", "gender": "여성", "age": "68", "is_alive": True, "rel_type": "밀접/친밀", "is_cohabit": True},
         {"relation": "자녀", "name": "장남", "gender": "남성", "age": "45", "is_alive": True, "rel_type": "보통", "is_cohabit": True},
-        {"relation": "사위/며느리", "name": "큰며느리", "gender": "여성", "age": "40", "is_alive": True, "rel_type": "보통", "is_cohabit": True}
+        {"relation": "사위/며느리", "name": "큰며느리", "gender": "여성", "age": "43", "is_alive": True, "rel_type": "보통", "is_cohabit": True},
+        {"relation": "자녀", "name": "차남", "gender": "남성", "age": "44", "is_alive": True, "rel_type": "보통", "is_cohabit": True},
+        {"relation": "사위/며느리", "name": "둘째며느리", "gender": "여성", "age": "41", "is_alive": True, "rel_type": "보통", "is_cohabit": True}
     ]
 
 # -------------------------------------------------------------
@@ -223,7 +225,7 @@ if selected_tool == "🌳 사례관리 생태도":
     st.download_button(label="💾 생태도 고화질 이미지 다운로드 (PNG)", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png")
 
 # =============================================================
-# [MODE 2] 가계도 모드 (사선 제거, 완전 직각/수직 그리드 적용)
+# [MODE 2] 가계도 모드 (사위/며느리 N명 1:1 매칭 및 균등 간격 알고리즘)
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
@@ -240,7 +242,7 @@ else:
     with st.sidebar.form("add_family_form"):
         st.subheader("➕ 가족/동거인 추가")
         f_rel = st.selectbox("관계 구분", ["배우자", "자녀", "동거인", "사위/며느리", "손자/손녀", "부(아버지)", "모(어머니)", "반려동물"])
-        f_name = st.text_input("이름/호칭 (예: 장남, 큰며느리, 차남 등)")
+        f_name = st.text_input("이름/호칭 (예: 장남, 큰며느리, 둘째며느리 등)")
         f_gender = st.radio("성별", ["남성", "여성", "기타(반려동물)"], horizontal=True, key="fam_gender")
         f_age = st.text_input("나이 (사망 시 '사망' 입력)")
         f_rel_type = st.selectbox("당사자/가족과의 관계 상태", ["동거/혼인", "사실혼", "동거인", "별거", "이혼", "불화/갈등", "소원", "단절", "보통", "밀접/친밀"])
@@ -368,7 +370,7 @@ else:
             ax.text(mid_x, cy + 0.08, "동거인", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'),
                     ha='center', va='center', color='#2E7D32', zorder=4, bbox=lbl_bbox)
 
-        # 2. 부모님 (1세대) - 부모님이 실제로 등록된 경우에만 직각 연결선 생성
+        # 2. 부모님 (1세대)
         if parents:
             py = 0.95
             father = [p for p in parents if "부" in p['relation']]
@@ -383,29 +385,30 @@ else:
                 if mother[0].get('is_cohabit'): cohabit_coords.append((p_mx, py))
 
             if father and mother:
-                # 부모 연결 수평선
                 ax.plot([p_fx + 0.1, p_mx - 0.1], [py, py], color='#B2BEC3', linestyle='--', lw=1.2, zorder=1)
-                # 직각 연결선 (수직 직하강 -> 수평 이동 -> 당사자로 수직 직하강)
                 p_mid_y = py - 0.25
                 ax.plot([0, 0], [py, p_mid_y], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
                 ax.plot([0, cx], [p_mid_y, p_mid_y], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
                 ax.plot([cx, cx], [p_mid_y, cy + 0.1], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
 
-        # 3. 자녀 세대 스마트 직각/수직 배치
+        # 3. 자녀 세대 정밀 그룹 및 사위/며느리 1:1 매칭 동적 배치
         if children:
             chy = -0.38
             branch_y = -0.08
             
+            # 자녀별 그룹 형성 (순서대로 사위/며느리 1:1 바인딩)
             family_groups = []
             for ch_idx, ch in enumerate(children):
-                if ch_idx == 0 and in_laws:
-                    family_groups.append({"type": "pair", "child": ch, "in_law": in_laws[0], "child_idx": ch_idx})
+                il = in_laws[ch_idx] if ch_idx < len(in_laws) else None
+                if il:
+                    family_groups.append({"type": "pair", "child": ch, "in_law": il, "child_idx": ch_idx})
                 else:
                     family_groups.append({"type": "single", "child": ch, "child_idx": ch_idx})
 
             group_count = len(family_groups)
             parent_mid_x = (cx + (sx if spouse else (coh_x if cohabitants else cx))) / 2
             
+            # 그룹별 가로 X 중심점 계산
             if group_count == 1:
                 group_xs = [parent_mid_x]
             else:
@@ -423,8 +426,8 @@ else:
                     if ch.get('is_cohabit'): cohabit_coords.append((gx, chy))
                 else:
                     il = group['in_law']
-                    ch_x = gx - 0.16
-                    il_x = gx + 0.16
+                    ch_x = gx - 0.15
+                    il_x = gx + 0.15
                     
                     draw_person(ch_x, chy, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
                     draw_person(il_x, chy, il['name'], il['age'], il['gender'], il['is_alive'])
@@ -451,15 +454,14 @@ else:
                             ax.plot([grx, grx], [chy - 0.2, gcy + 0.1], color='#2D3436', lw=1.2, zorder=1)
                             if gc.get('is_cohabit'): cohabit_coords.append((grx, gcy))
 
-            # [사선 완전 제거] 자녀선 가계선 출력 (수직 1자선 또는 직각 T자선)
+            # 자녀 세대 연결선 출력 (수직 직하강 또는 T자선)
+            real_ch_xs = [child_coords_map[k] for k in sorted(child_coords_map.keys())]
+
             if group_count == 1:
                 target_gx = group_xs[0]
-                # 부부선 중앙에서 그룹 센터(target_gx)로 정확한 수직 직하강
                 ax.plot([target_gx, target_gx], [cy - 0.1, chy + 0.1], color='#2D3436', lw=1.3, zorder=1)
             else:
-                # 2개 그룹 이상일 때는 부부선 중앙 직하강 -> 수평 정렬 -> 수직 연결
                 ax.plot([parent_mid_x, parent_mid_x], [cy - 0.1, branch_y], color='#2D3436', lw=1.3, zorder=1)
-                real_ch_xs = [child_coords_map[k] for k in sorted(child_coords_map.keys())]
                 ax.plot([real_ch_xs[0], real_ch_xs[-1]], [branch_y, branch_y], color='#2D3436', lw=1.3, zorder=1)
 
                 for ch_idx, ch in enumerate(children):
