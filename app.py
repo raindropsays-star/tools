@@ -52,9 +52,7 @@ if "family_members" not in st.session_state:
     st.session_state.family_members = [
         {"relation": "배우자", "name": "배우자", "gender": "여성", "age": "68", "is_alive": True, "rel_type": "밀접/친밀", "is_cohabit": True},
         {"relation": "자녀", "name": "장남", "gender": "남성", "age": "45", "is_alive": True, "rel_type": "보통", "is_cohabit": True},
-        {"relation": "사위/며느리", "name": "큰며느리", "gender": "여성", "age": "40", "is_alive": True, "rel_type": "보통", "is_cohabit": True},
-        {"relation": "자녀", "name": "장녀", "gender": "여성", "age": "42", "is_alive": True, "rel_type": "보통", "is_cohabit": True},
-        {"relation": "자녀", "name": "차남", "gender": "남성", "age": "43", "is_alive": True, "rel_type": "보통", "is_cohabit": True}
+        {"relation": "사위/며느리", "name": "큰며느리", "gender": "여성", "age": "40", "is_alive": True, "rel_type": "보통", "is_cohabit": True}
     ]
 
 # -------------------------------------------------------------
@@ -223,7 +221,7 @@ if selected_tool == "🌳 사례관리 생태도":
     st.download_button(label="💾 생태도 고화질 이미지 다운로드 (PNG)", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png")
 
 # =============================================================
-# [MODE 2] 가계도 모드 (레이아웃 시각 정밀 보정)
+# [MODE 2] 가계도 모드 (1자 직하강 자녀선 스마트 연결 적용)
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
@@ -368,7 +366,7 @@ else:
             ax.text(mid_x, cy + 0.08, "동거인", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'),
                     ha='center', va='center', color='#2E7D32', zorder=4, bbox=lbl_bbox)
 
-        # 2. 부모님 (1세대) - 부모님이 실제로 등록된 경우에만 연결선 그리기
+        # 2. 부모님 (1세대)
         if parents:
             py = 0.95
             father = [p for p in parents if "부" in p['relation']]
@@ -387,28 +385,29 @@ else:
                 ax.plot([0, 0], [py, py - 0.25], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
                 ax.plot([0, cx], [py - 0.25, cy + 0.1], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
 
-        # 3. 자녀 세대 정밀 그룹 배치 (부부 그룹 묶음 정렬)
+        # 3. 자녀 세대 스마트 정렬 (1자 직선/T자선 스마트 전환)
         if children:
             chy = -0.38
             branch_y = -0.08
             
-            # 자녀 세대 노드 그룹 정의
-            # 구조: [{"type": "pair", "child": ch, "in_law": il}, {"type": "single", "child": ch}]
             family_groups = []
-            used_in_laws = set()
-
             for ch_idx, ch in enumerate(children):
                 if ch_idx == 0 and in_laws:
                     family_groups.append({"type": "pair", "child": ch, "in_law": in_laws[0], "child_idx": ch_idx})
-                    used_in_laws.add(0)
                 else:
                     family_groups.append({"type": "single", "child": ch, "child_idx": ch_idx})
 
             group_count = len(family_groups)
-            group_xs = list(np.linspace(-0.65, 0.65, group_count)) if group_count > 1 else [0.0]
+            
+            # 단일 자녀일 때는 부부선 중심(parent_mid_x) 수직 직하강 위치로 맞춤
+            parent_mid_x = (cx + (sx if spouse else (coh_x if cohabitants else cx))) / 2
+            
+            if group_count == 1:
+                group_xs = [parent_mid_x]
+            else:
+                group_xs = list(np.linspace(-0.65, 0.65, group_count))
 
             child_coords_map = {}
-            parent_mid_x = (cx + (sx if spouse else (coh_x if cohabitants else cx))) / 2
 
             for g_idx, group in enumerate(family_groups):
                 gx = group_xs[g_idx]
@@ -419,7 +418,6 @@ else:
                     child_coords_map[group['child_idx']] = gx
                     if ch.get('is_cohabit'): cohabit_coords.append((gx, chy))
                 else:
-                    # 부부 묶음 (자녀 + 사위/며느리 붙여서 배치)
                     il = group['in_law']
                     ch_x = gx - 0.16
                     il_x = gx + 0.16
@@ -449,42 +447,45 @@ else:
                             ax.plot([grx, grx], [chy - 0.2, gcy + 0.1], color='#2D3436', lw=1.2, zorder=1)
                             if gc.get('is_cohabit'): cohabit_coords.append((grx, gcy))
 
-            # T자 가계선 생성
-            ax.plot([parent_mid_x, parent_mid_x], [cy - 0.1, branch_y], color='#2D3436', lw=1.3, zorder=1)
-
+            # [핵심] 자녀선 가계선 그리기 (1명이면 수직 1자선, 2명이상이면 T자 수평선)
             real_ch_xs = [child_coords_map[k] for k in sorted(child_coords_map.keys())]
-            if len(real_ch_xs) > 1:
+
+            if group_count == 1:
+                # 꺾임 없이 부부선 중앙에서 자녀선으로 수직 직하강
+                single_ch_x = real_ch_xs[0]
+                ax.plot([parent_mid_x, single_ch_x], [cy - 0.1, chy + 0.1], color='#2D3436', lw=1.3, zorder=1)
+            else:
+                # 2개 그룹 이상일 때는 기존 T자 가계선
+                ax.plot([parent_mid_x, parent_mid_x], [cy - 0.1, branch_y], color='#2D3436', lw=1.3, zorder=1)
                 ax.plot([real_ch_xs[0], real_ch_xs[-1]], [branch_y, branch_y], color='#2D3436', lw=1.3, zorder=1)
-            elif len(real_ch_xs) == 1:
-                ax.plot([parent_mid_x, real_ch_xs[0]], [branch_y, branch_y], color='#2D3436', lw=1.3, zorder=1)
 
-            for ch_idx, ch in enumerate(children):
-                chx = child_coords_map[ch_idx]
-                ch_rel = ch.get('rel_type', '보통')
-                ch_mid_y = (branch_y + chy) / 2
-                lbl_bbox_small = dict(boxstyle="round,pad=0.15", fc="#FFFFFF", ec="none", alpha=0.85)
+                for ch_idx, ch in enumerate(children):
+                    chx = child_coords_map[ch_idx]
+                    ch_rel = ch.get('rel_type', '보통')
+                    ch_mid_y = (branch_y + chy) / 2
+                    lbl_bbox_small = dict(boxstyle="round,pad=0.15", fc="#FFFFFF", ec="none", alpha=0.85)
 
-                if ch_rel == '불화/갈등':
-                    ax.plot([chx, chx], [branch_y, chy + 0.1], color='#D63031', linestyle='--', lw=1.5, zorder=2)
-                    ax.text(chx + 0.08, ch_mid_y, "불화", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
-                            ha='left', va='center', color='#D63031', zorder=4, bbox=lbl_bbox_small)
-                elif ch_rel == '소원':
-                    ax.plot([chx, chx], [branch_y, chy + 0.1], color='#7F8C8D', linestyle='--', lw=1.3, zorder=2)
-                    ax.text(chx + 0.08, ch_mid_y, "소원", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
-                            ha='left', va='center', color='#7F8C8D', zorder=4, bbox=lbl_bbox_small)
-                elif ch_rel == '단절':
-                    ax.plot([chx, chx], [branch_y, chy + 0.1], color='#2D3436', lw=1.3, zorder=2)
-                    ax.plot([chx - 0.03, chx + 0.03], [ch_mid_y - 0.03, ch_mid_y + 0.03], color='#2D3436', lw=1.8, zorder=3)
-                    ax.plot([chx - 0.03, chx + 0.03], [ch_mid_y + 0.03, ch_mid_y - 0.03], color='#2D3436', lw=1.8, zorder=3)
-                    ax.text(chx + 0.08, ch_mid_y, "단절", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
-                            ha='left', va='center', color='#2D3436', zorder=4, bbox=lbl_bbox_small)
-                elif ch_rel == '밀접/친밀':
-                    ax.plot([chx - 0.015, chx - 0.015], [branch_y, chy + 0.1], color='#1976D2', lw=1.5, zorder=2)
-                    ax.plot([chx + 0.015, chx + 0.015], [branch_y, chy + 0.1], color='#1976D2', lw=1.5, zorder=2)
-                    ax.text(chx + 0.08, ch_mid_y, "친밀", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
-                            ha='left', va='center', color='#1976D2', zorder=4, bbox=lbl_bbox_small)
-                else:
-                    ax.plot([chx, chx], [branch_y, chy + 0.1], color='#2D3436', lw=1.3, zorder=1)
+                    if ch_rel == '불화/갈등':
+                        ax.plot([chx, chx], [branch_y, chy + 0.1], color='#D63031', linestyle='--', lw=1.5, zorder=2)
+                        ax.text(chx + 0.08, ch_mid_y, "불화", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
+                                ha='left', va='center', color='#D63031', zorder=4, bbox=lbl_bbox_small)
+                    elif ch_rel == '소원':
+                        ax.plot([chx, chx], [branch_y, chy + 0.1], color='#7F8C8D', linestyle='--', lw=1.3, zorder=2)
+                        ax.text(chx + 0.08, ch_mid_y, "소원", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
+                                ha='left', va='center', color='#7F8C8D', zorder=4, bbox=lbl_bbox_small)
+                    elif ch_rel == '단절':
+                        ax.plot([chx, chx], [branch_y, chy + 0.1], color='#2D3436', lw=1.3, zorder=2)
+                        ax.plot([chx - 0.03, chx + 0.03], [ch_mid_y - 0.03, ch_mid_y + 0.03], color='#2D3436', lw=1.8, zorder=3)
+                        ax.plot([chx - 0.03, chx + 0.03], [ch_mid_y + 0.03, ch_mid_y - 0.03], color='#2D3436', lw=1.8, zorder=3)
+                        ax.text(chx + 0.08, ch_mid_y, "단절", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
+                                ha='left', va='center', color='#2D3436', zorder=4, bbox=lbl_bbox_small)
+                    elif ch_rel == '밀접/친밀':
+                        ax.plot([chx - 0.015, chx - 0.015], [branch_y, chy + 0.1], color='#1976D2', lw=1.5, zorder=2)
+                        ax.plot([chx + 0.015, chx + 0.015], [branch_y, chy + 0.1], color='#1976D2', lw=1.5, zorder=2)
+                        ax.text(chx + 0.08, ch_mid_y, "친밀", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
+                                ha='left', va='center', color='#1976D2', zorder=4, bbox=lbl_bbox_small)
+                    else:
+                        ax.plot([chx, chx], [branch_y, chy + 0.1], color='#2D3436', lw=1.3, zorder=1)
 
         # 5. 반려동물
         if pets:
@@ -495,7 +496,7 @@ else:
                 draw_person(px, pet_y, pt['name'], pt['age'], pt['gender'], pt['is_alive'])
                 if pt.get('is_cohabit'): cohabit_coords.append((px, pet_y))
 
-        # 6. 동거인 영역 (여백 정밀 반영)
+        # 6. 동거인 영역
         if len(cohabit_coords) > 0:
             xs = [c[0] for c in cohabit_coords]
             ys = [c[1] for c in cohabit_coords]
