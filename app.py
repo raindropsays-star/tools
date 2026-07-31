@@ -37,7 +37,7 @@ if "client_name" not in st.session_state:
 if "nodes" not in st.session_state:
     st.session_state.nodes = [
         {"name": "장기요양", "role": "요양보호사 파견", "type": "공식체계", "strength": "강함", "direction": "체계 ➔ 대상자"},
-        {"name": "방문진료", "role": "월 1회 정기 검진", "type": "공식체계", "strength": "보통", "direction": "체계 ➔ 대상자"},
+        {"name": "방문진료", "role": "월1회 방문진료", "type": "공식체계", "strength": "강함", "direction": "대상자 ➔ 체계"},
         {"name": "보건소", "role": "맞춤형 방문건강", "type": "공식체계", "strength": "보통", "direction": "체계 ➔ 대상자"},
         {"name": "노인맞춤돌봄", "role": "안부확인", "type": "공식체계", "strength": "보통", "direction": "체계 ➔ 대상자"},
         {"name": "오래된 친구", "role": "정서적 지지", "type": "비공식체계", "strength": "강함", "direction": "쌍방향 (↔)"},
@@ -153,12 +153,12 @@ def draw_pretty_ecomap(nodes, client_name):
     ax.text(0.55, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=15, weight='bold'),
             ha='center', va='center', color='#1B5E20', zorder=2, bbox=bbox_unofficial)
 
-    # 4. 중앙 대상자 노드 (zorder=2)
+    # 4. 중앙 대상자 노드
     ax.scatter(0, 0, s=3600, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.5, zorder=2)
     ax.text(0, 0, center_id, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=14, weight='bold'),
             ha='center', va='center', color='#2D3436', zorder=3)
 
-    # 5. 체계 노드 그리기 (zorder=2, 3)
+    # 5. 체계 노드 그리기
     def draw_node_box(n_list, bg_color, border_color):
         for n in n_list:
             x, y = pos[n['name']]
@@ -176,7 +176,7 @@ def draw_pretty_ecomap(nodes, client_name):
     draw_node_box(official, "#E3F2FD", "#90CAF9")
     draw_node_box(unofficial, "#E8F5E9", "#A5D6A7")
 
-    # 6. 화살표 그리기 (zorder=4로 변경하여 원 및 상자 위로 노출 + shrinkB 오프셋 정밀 조정)
+    # 6. 화살표 정밀 여백 조정 (방향별 오프셋 정밀 분기)
     for n in nodes:
         target_x, target_y = pos[n['name']]
         
@@ -193,25 +193,29 @@ def draw_pretty_ecomap(nodes, client_name):
             style = 'solid'
             color = '#2D3436'
 
+        # 방향별 출발점, 도착점 및 상자/원과의 여백 오프셋 지정
         if "체계 ➔ 대상자" in n['direction']:
             start_pt = (target_x, target_y)
             end_pt = (0, 0)
             arr_style = "->"
+            sA, sB = 48, 42  # 출발(체계 상자 여백): 48, 도착(중앙 원 여백): 42
         elif "대상자 ➔ 체계" in n['direction']:
             start_pt = (0, 0)
             end_pt = (target_x, target_y)
             arr_style = "->"
+            sA, sB = 42, 48  # 출발(중앙 원 여백): 42, 도착(체계 상자 여백): 48 -> 상자 침범 완벽 방지
         elif "쌍방향" in n['direction']:
             start_pt = (target_x, target_y)
             end_pt = (0, 0)
             arr_style = "<->"
+            sA, sB = 48, 42  # 체계 상자쪽 48, 중앙 원쪽 42
         else:
             start_pt = (target_x, target_y)
             end_pt = (0, 0)
             arr_style = "-"
+            sA, sB = 48, 42
 
-        # shrinkA: 체계 상자 쪽 여백, shrinkB: 중앙 당사자 원 쪽 여백(원 반지름에 딱 맞춰 42로 확장)
-        arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=38, shrinkB=42)
+        arrow = dict(arrowstyle=arr_style, linestyle=style, linewidth=lw, color=color, shrinkA=sA, shrinkB=sB)
         ax.annotate("", xy=end_pt, xytext=start_pt, arrowprops=arrow, zorder=4)
 
     # 하단 범례 표시
@@ -239,5 +243,5 @@ with col2:
     st.markdown("---")
     st.markdown("""
     **개선 사항:**
-    - 중앙 원 테두리에 딱 맞춰 화살표 머리가 선명하게 드러나도록 레이어 및 오프셋을 수정했습니다.
+    - 체계로 향하는 일방향 화살표 머리가 네모 상자 겉에 딱 멈추도록 오프셋을 정밀하게 보정했습니다.
     """)
