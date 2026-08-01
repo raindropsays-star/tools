@@ -201,8 +201,8 @@ if selected_tool == "🌳 사례관리 생태도":
 
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
     
-    # [수정포인트] 레이아웃 통일 및 스케일업 (2.5 -> 4로 확장)
-    col_e1, col_e2, col_e3 = st.columns([1, 4, 1])
+    # [수정포인트] 딱 중간 사이즈인 3.2 비율 적용
+    col_e1, col_e2, col_e3 = st.columns([1, 3.2, 1])
     with col_e2:
         st.pyplot(fig1, use_container_width=True)
         buf1 = io.BytesIO()
@@ -290,7 +290,6 @@ else:
             ax.text(x, y - box_s/2 - 0.07, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                     ha='center', va='top', color='#2D3436', zorder=5)
 
-        # 1. 당사자 및 배우자
         cx, cy = (0, 0.85) if (not spouse and not cohabitants) else (-0.45, 0.85)
         draw_person(cx, cy, client['name'], client['age'], client['gender'], client['is_alive'], is_target=True)
         if client.get('is_cohabit', True): cohabit_points.append((cx, cy))
@@ -550,8 +549,6 @@ else:
             mid_x_val = (min_x[sorted_ys[0]] + max_x[sorted_ys[0]]) / 2.0
             ax.text(mid_x_val, top_y_val + 0.03, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), ha='center', va='bottom', color='#1B5E20', zorder=1)
 
-        # ax.text(...) 하단 주석 제거 완료
-
         ax.set_xlim(-1.65, 1.65)
         ax.set_ylim(-1.80, 1.50)
         
@@ -561,8 +558,8 @@ else:
 
     fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members)
     
-    # [레이아웃 통일 및 스케일업] 생태도와 완벽히 동일한 [1, 4, 1] 비율 적용 (깜빡임 완벽 제거)
-    col_g1, col_g2, col_g3 = st.columns([1, 4, 1])
+    # [수정포인트] 딱 중간 사이즈인 3.2 비율 동일 적용
+    col_g1, col_g2, col_g3 = st.columns([1, 3.2, 1])
     with col_g2:
         st.pyplot(fig2, use_container_width=True)
         buf2 = io.BytesIO()
