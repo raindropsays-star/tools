@@ -24,11 +24,12 @@ plt.rcParams['axes.unicode_minus'] = False
 
 st.set_page_config(page_title="사례관리 스마트 생태도/가계도 생성기", layout="wide")
 
-# 상단 여백을 깔끔하게 제거하여 화면 맨 위로 끌어올림
+# [핵심 수정] 상단 여백 제거 + 화면 전환 시 찌그러지는 애니메이션(잔상) 원천 차단
 st.markdown("""
 <style>
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; margin-top: -30px !important; }
     header { visibility: hidden; }
+    div[data-testid="column"] { transition: none !important; } 
 </style>
 """, unsafe_allow_html=True)
 
@@ -66,7 +67,7 @@ selected_tool = st.sidebar.radio("원하시는 도구를 선택하세요", ["�
 st.sidebar.markdown("---")
 
 # =============================================================
-# [MODE 1] 생태도 모드 (완벽한 현재 상태 유지)
+# [MODE 1] 생태도 모드 (가장 마음에 드셨던 완벽한 버전 복구)
 # =============================================================
 if selected_tool == "🌳 사례관리 생태도":
     st.sidebar.header("🌳 [생태도] 정보 입력")
@@ -205,13 +206,12 @@ if selected_tool == "🌳 사례관리 생태도":
     col_e1, col_e2, col_e3 = st.columns([1, 1.5, 1])
     with col_e2:
         st.pyplot(fig1, use_container_width=True)
-        
         buf1 = io.BytesIO()
         fig1.savefig(buf1, format="png", bbox_inches='tight', pad_inches=0.02, dpi=300)
         st.download_button(label="💾 생태도 이미지 다운로드", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png", use_container_width=True)
 
 # =============================================================
-# [MODE 2] 가계도 모드 (동거영역 완벽 유지 + 스케일만 적절히 키움)
+# [MODE 2] 가계도 모드 (계단식 다각형 유지 + 스케일 적절히 키움)
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
@@ -252,7 +252,7 @@ else:
             st.rerun()
 
     def draw_pretty_genogram(client, members):
-        fig, ax = plt.subplots(figsize=(7.35, 5.0), dpi=200)
+        fig, ax = plt.subplots(figsize=(7.5, 5.0), dpi=200)
         ax.set_aspect('equal') 
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
@@ -474,7 +474,7 @@ else:
                 draw_person(px, pet_y, pt['name'], pt['age'], pt['gender'], pt['is_alive'])
                 if pt.get('is_cohabit'): cohabit_points.append((px, pet_y))
 
-        # 6. [동거가족 유지] ㄷ자 계단형태(Step Polygon)
+        # 6. [계단식 다각형 완벽 복구]
         if len(cohabit_points) > 0:
             y_groups = {}
             for px, py in cohabit_points:
@@ -497,7 +497,7 @@ else:
             verts = []
             codes = []
             
-            # 왼쪽 라인
+            # 왼쪽 사이드 점선 따라가기
             for i, gy in enumerate(sorted_ys):
                 mx = min_x[gy]
                 ty = top_y[gy]
@@ -518,7 +518,7 @@ else:
                 verts.append((mx, by))
                 codes.append(mpath.Path.LINETO)
                 
-            # 오른쪽 라인
+            # 오른쪽 사이드 점선 따라가기
             reversed_ys = list(reversed(sorted_ys))
             for i, gy in enumerate(reversed_ys):
                 mx = max_x[gy]
@@ -557,18 +557,16 @@ else:
         
         ax.set_xlim(-1.40, 1.40)
         ax.set_ylim(-0.45, 1.45)
-        
         plt.axis("off")
         plt.tight_layout(pad=0.0)
         return fig
 
     fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members)
     
-    # [가계도 스케일 수정 포인트] 가계도 역시 아까보다 더 키워서 보기 좋은 중간 사이즈(비율 2.2)로 조정
-    col_g1, col_g2, col_g3 = st.columns([1, 2.2, 1])
+    # [핵심] 가계도 스케일을 적절하게 키움 (중앙 레이아웃 비율을 1:2.5:1 로 확장)
+    col_g1, col_g2, col_g3 = st.columns([1, 2.5, 1])
     with col_g2:
         st.pyplot(fig2, use_container_width=True)
-        
         buf2 = io.BytesIO()
         fig2.savefig(buf2, format="png", bbox_inches='tight', pad_inches=0.02, dpi=300)
         st.download_button(label="💾 가계도 이미지 다운로드", data=buf2.getvalue(), file_name=f"가계도_{st.session_state.gen_client['name']}.png", mime="image/png", use_container_width=True)
