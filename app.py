@@ -24,7 +24,7 @@ plt.rcParams['axes.unicode_minus'] = False
 
 st.set_page_config(page_title="사례관리 스마트 생태도/가계도 생성기", layout="wide")
 
-# [핵심 수정] 상단 여백 제거 + 화면 전환 시 찌그러지는 애니메이션(잔상) 원천 차단
+# 상단 여백 제거 + 화면 전환 시 찌그러지는 애니메이션(잔상) 원천 차단
 st.markdown("""
 <style>
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; margin-top: -30px !important; }
@@ -67,7 +67,7 @@ selected_tool = st.sidebar.radio("원하시는 도구를 선택하세요", ["�
 st.sidebar.markdown("---")
 
 # =============================================================
-# [MODE 1] 생태도 모드 (가장 마음에 드셨던 완벽한 버전 복구)
+# [MODE 1] 생태도 모드
 # =============================================================
 if selected_tool == "🌳 사례관리 생태도":
     st.sidebar.header("🌳 [생태도] 정보 입력")
@@ -128,7 +128,8 @@ if selected_tool == "🌳 사례관리 생태도":
         return center_x + dx * scale, center_y + dy * scale
 
     def draw_pretty_ecomap(nodes, client_name):
-        fig, ax = plt.subplots(figsize=(4.0, 4.0), dpi=200)
+        # [스케일 통일] 가계도와 완벽히 동일한 5.5 x 5.5 캔버스
+        fig, ax = plt.subplots(figsize=(5.5, 5.5), dpi=200)
         ax.set_aspect('equal')
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
@@ -193,17 +194,20 @@ if selected_tool == "🌳 사례관리 생태도":
             arrow_patch = patches.FancyArrowPatch(p_from, p_to, arrowstyle=a_style, linestyle=style, linewidth=lw, color=color, mutation_scale=8.5, zorder=5)
             ax.add_patch(arrow_patch)
 
-        ax.text(0, -1.12, "↔ 쌍방향·강함     ➔ 일방향·보통     ---> 점선·약함", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#2D3436')
-        
-        ax.set_xlim(-1.20, 1.20)
-        ax.set_ylim(-1.20, 1.20)
+        # 하단 주석 완전 삭제
+        # ax.text(...) 구문 제거 완료
+
+        # 완벽한 정사각형 비율 유지
+        ax.set_xlim(-1.25, 1.25)
+        ax.set_ylim(-1.25, 1.25)
         plt.axis("off")
         plt.tight_layout(pad=0.0)
         return fig
 
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
     
-    col_e1, col_e2, col_e3 = st.columns([1, 1.5, 1])
+    # [레이아웃 통일] 가계도와 완벽히 동일한 [1, 2.5, 1] 비율 적용
+    col_e1, col_e2, col_e3 = st.columns([1, 2.5, 1])
     with col_e2:
         st.pyplot(fig1, use_container_width=True)
         buf1 = io.BytesIO()
@@ -211,7 +215,7 @@ if selected_tool == "🌳 사례관리 생태도":
         st.download_button(label="💾 생태도 이미지 다운로드", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png", use_container_width=True)
 
 # =============================================================
-# [MODE 2] 가계도 모드 (계단식 다각형 유지 + 스케일 적절히 키움)
+# [MODE 2] 가계도 모드
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
@@ -252,7 +256,8 @@ else:
             st.rerun()
 
     def draw_pretty_genogram(client, members):
-        fig, ax = plt.subplots(figsize=(7.5, 5.0), dpi=200)
+        # [스케일 통일] 생태도와 완벽히 동일한 5.5 x 5.5 정사각형 캔버스
+        fig, ax = plt.subplots(figsize=(5.5, 5.5), dpi=200)
         ax.set_aspect('equal') 
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
@@ -291,7 +296,7 @@ else:
             ax.text(x, y - box_s/2 - 0.07, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                     ha='center', va='top', color='#2D3436', zorder=5)
 
-        # 1. 당사자 및 배우자
+        # [Top-Align] 가계도를 위에서부터 그립니다. Y좌표의 기준점을 0.85로 세팅합니다.
         cx, cy = (0, 0.85) if (not spouse and not cohabitants) else (-0.45, 0.85)
         draw_person(cx, cy, client['name'], client['age'], client['gender'], client['is_alive'], is_target=True)
         if client.get('is_cohabit', True): cohabit_points.append((cx, cy))
@@ -474,7 +479,7 @@ else:
                 draw_person(px, pet_y, pt['name'], pt['age'], pt['gender'], pt['is_alive'])
                 if pt.get('is_cohabit'): cohabit_points.append((px, pet_y))
 
-        # 6. [계단식 다각형 완벽 복구]
+        # 6. [동거가족 유지] 비동거인은 완벽히 피하는 부드러운 '계단식 다각형(Step Polygon)'
         if len(cohabit_points) > 0:
             y_groups = {}
             for px, py in cohabit_points:
@@ -553,17 +558,21 @@ else:
             mid_x_val = (min_x[sorted_ys[0]] + max_x[sorted_ys[0]]) / 2.0
             ax.text(mid_x_val, top_y_val + 0.03, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), ha='center', va='bottom', color='#1B5E20', zorder=1)
 
-        ax.text(0, -0.38, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#636E72')
+        # 하단 주석 완전 삭제
+        # ax.text(...) 구문 제거 완료
+
+        # [수학적 비율 고정] 생태도와 완벽히 똑같은 1:1 비율 세팅 (폭 3.3 = 1.65+1.65, 높이 3.3 = 1.8+1.5)
+        # 1-2세대를 위쪽에 매달리게 하기 위해 Y의 위를 1.5, 아래 빈공간을 -1.8로 둡니다.
+        ax.set_xlim(-1.65, 1.65)
+        ax.set_ylim(-1.80, 1.50)
         
-        ax.set_xlim(-1.40, 1.40)
-        ax.set_ylim(-0.45, 1.45)
         plt.axis("off")
         plt.tight_layout(pad=0.0)
         return fig
 
     fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members)
     
-    # [핵심] 가계도 스케일을 적절하게 키움 (중앙 레이아웃 비율을 1:2.5:1 로 확장)
+    # [레이아웃 통일] 생태도와 완벽히 동일한 [1, 2.5, 1] 비율 적용 (깜빡임 완벽 제거)
     col_g1, col_g2, col_g3 = st.columns([1, 2.5, 1])
     with col_g2:
         st.pyplot(fig2, use_container_width=True)
