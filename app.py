@@ -2,6 +2,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import matplotlib.patches as patches
+import matplotlib.path as mpath
 import numpy as np
 import urllib.request
 import os
@@ -23,10 +24,10 @@ plt.rcParams['axes.unicode_minus'] = False
 
 st.set_page_config(page_title="사례관리 스마트 생태도/가계도 생성기", layout="wide")
 
-# 상단 여백 최적화
+# CSS 꼼수를 제거하고 표준 여백 사용 (그림 내부 여백을 잘라내어 상단 밀착)
 st.markdown("""
 <style>
-    .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; }
+    .block-container { padding-top: 1.5rem !important; padding-bottom: 1.5rem !important; }
     header { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
@@ -128,7 +129,7 @@ if selected_tool == "🌳 사례관리 생태도":
         return center_x + dx * scale, center_y + dy * scale
 
     def draw_pretty_ecomap(nodes, client_name):
-        fig, ax = plt.subplots(figsize=(5.0, 4.6), dpi=200)
+        fig, ax = plt.subplots(figsize=(6.0, 5.0), dpi=200)
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
@@ -209,25 +210,23 @@ if selected_tool == "🌳 사례관리 생태도":
 
         ax.text(0, -1.2, "↔ 쌍방향·강함     ➔ 일방향·보통     ---> 점선·약함", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#2D3436')
         
-        ax.set_xlim(-1.30, 1.30)
-        ax.set_ylim(-1.30, 1.30)
+        # 내부 캔버스 공간을 최소화하여 상단에 바짝 밀착
+        ax.set_xlim(-1.25, 1.25)
+        ax.set_ylim(-1.25, 1.20)
         plt.axis("off")
         plt.tight_layout(pad=0.0)
         return fig
 
-    # 다운로드 버튼을 차트 바로 위 적당한 위치에 배치
-    col_t1, col_t2 = st.columns([4, 1])
-    col_t2.markdown("<div style='margin-top: 10px;'>", unsafe_allow_html=True)
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
-    buf1 = io.BytesIO()
-    fig1.savefig(buf1, format="png", bbox_inches='tight', pad_inches=0.02, dpi=300)
-    col_t2.download_button(label="💾 이미지 다운로드", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png", key="dl_eco")
-    col_t2.markdown("</div>", unsafe_allow_html=True)
-
     st.pyplot(fig1, use_container_width=False)
+    
+    # 다운로드 버튼을 차트 바로 밑으로 빼서 안정적으로 배치
+    buf1 = io.BytesIO()
+    fig1.savefig(buf1, format="png", bbox_inches='tight', pad_inches=0.05, dpi=300)
+    st.download_button(label="💾 생태도 이미지 다운로드", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png", key="dl_eco")
 
 # =============================================================
-# [MODE 2] 가계도 모드 (통합 유기적 동거 영역 + 최상단 밀착)
+# [MODE 2] 가계도 모드 (계단식 유기적 동거 영역 + 동적 Y축 상단 밀착)
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
@@ -268,7 +267,7 @@ else:
             st.rerun()
 
     def draw_pretty_genogram(client, members):
-        fig, ax = plt.subplots(figsize=(6.0, 4.4), dpi=200)
+        fig, ax = plt.subplots(figsize=(6.5, 4.8), dpi=200)
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
@@ -281,8 +280,10 @@ else:
         pets = [m for m in members if "반려동물" in m['relation']]
 
         cohabit_points = []
+        all_y_coords = [] # Y축 동적 설정을 위한 모든 좌표 수집
 
         def draw_person(x, y, name, age, gender, is_alive, is_target=False):
+            all_y_coords.append(y)
             box_s = 0.18
             color = '#FFEAA7' if is_target else ('#E3F2FD' if gender == '남성' else ('#FCE4EC' if gender == '여성' else '#E8F5E9'))
             edge_c = '#FDCB6E' if is_target else ('#1976D2' if gender == '남성' else ('#C2185B' if gender == '여성' else '#388E3C'))
@@ -306,14 +307,14 @@ else:
             ax.text(x, y - box_s/2 - 0.07, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                     ha='center', va='top', color='#2D3436', zorder=5)
 
-        # 1. 당사자 및 배우자 (화면 맨 위: Y = 1.0)
-        cx, cy = (0, 1.0) if (not spouse and not cohabitants) else (-0.45, 1.0)
+        # 1. 당사자 및 배우자
+        cx, cy = (0, 0.85) if (not spouse and not cohabitants) else (-0.45, 0.85)
         draw_person(cx, cy, client['name'], client['age'], client['gender'], client['is_alive'], is_target=True)
         if client.get('is_cohabit', True): 
             cohabit_points.append((cx, cy))
 
         if spouse:
-            sx, sy = (0.45, 1.0)
+            sx, sy = (0.45, 0.85)
             sp = spouse[0]
             draw_person(sx, sy, sp['name'], sp['age'], sp['gender'], sp['is_alive'])
             if sp.get('is_cohabit', False): 
@@ -325,46 +326,39 @@ else:
 
             if rel == '사실혼':
                 ax.plot([cx + 0.1, sx - 0.1], [cy, sy], color='#2D3436', linestyle='--', lw=1.5, zorder=2)
-                ax.text(mid_x, cy + 0.08, "사실혼", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
-                        ha='center', va='center', color='#27AE60', zorder=4, bbox=lbl_bbox)
+                ax.text(mid_x, cy + 0.08, "사실혼", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'), ha='center', va='center', color='#27AE60', zorder=4, bbox=lbl_bbox)
             elif rel == '이혼':
                 ax.plot([cx + 0.1, sx - 0.1], [cy, sy], color='#2D3436', lw=1.5, zorder=2)
                 ax.plot([mid_x - 0.04, mid_x - 0.01], [cy - 0.05, cy + 0.05], color='#D63031', lw=1.8, zorder=3)
                 ax.plot([mid_x + 0.01, mid_x + 0.04], [cy - 0.05, cy + 0.05], color='#D63031', lw=1.8, zorder=3)
-                ax.text(mid_x, cy + 0.08, "이혼", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
-                        ha='center', va='center', color='#D63031', zorder=4, bbox=lbl_bbox)
+                ax.text(mid_x, cy + 0.08, "이혼", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'), ha='center', va='center', color='#D63031', zorder=4, bbox=lbl_bbox)
             elif rel == '별거':
                 ax.plot([cx + 0.1, sx - 0.1], [cy, sy], color='#2D3436', lw=1.5, zorder=2)
                 ax.plot([mid_x, mid_x + 0.03], [cy - 0.05, cy + 0.05], color='#E67E22', lw=1.8, zorder=3)
-                ax.text(mid_x, cy + 0.08, "별거", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
-                        ha='center', va='center', color='#E67E22', zorder=4, bbox=lbl_bbox)
+                ax.text(mid_x, cy + 0.08, "별거", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'), ha='center', va='center', color='#E67E22', zorder=4, bbox=lbl_bbox)
             elif rel == '불화/갈등':
                 xs = np.linspace(cx + 0.1, sx - 0.1, 20)
                 ys = cy + 0.02 * np.sin(xs * 30)
                 ax.plot(xs, ys, color='#D63031', lw=1.8, zorder=2)
-                ax.text(mid_x, cy + 0.08, "불화", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
-                        ha='center', va='center', color='#D63031', zorder=4, bbox=lbl_bbox)
+                ax.text(mid_x, cy + 0.08, "불화", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'), ha='center', va='center', color='#D63031', zorder=4, bbox=lbl_bbox)
             elif rel == '소원':
                 ax.plot([cx + 0.1, sx - 0.1], [cy, sy], color='#7F8C8D', linestyle='--', lw=1.5, zorder=2)
-                ax.text(mid_x, cy + 0.08, "소원", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
-                        ha='center', va='center', color='#7F8C8D', zorder=4, bbox=lbl_bbox)
+                ax.text(mid_x, cy + 0.08, "소원", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'), ha='center', va='center', color='#7F8C8D', zorder=4, bbox=lbl_bbox)
             elif rel == '단절':
                 ax.plot([cx + 0.1, sx - 0.1], [cy, sy], color='#2D3436', lw=1.5, zorder=2)
                 ax.plot([mid_x - 0.03, mid_x + 0.03], [cy - 0.04, cy + 0.04], color='#2D3436', lw=2.0, zorder=3)
                 ax.plot([mid_x - 0.03, mid_x + 0.03], [cy + 0.04, cy - 0.04], color='#2D3436', lw=2.0, zorder=3)
-                ax.text(mid_x, cy + 0.08, "단절", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
-                        ha='center', va='center', color='#2D3436', zorder=4, bbox=lbl_bbox)
+                ax.text(mid_x, cy + 0.08, "단절", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'), ha='center', va='center', color='#2D3436', zorder=4, bbox=lbl_bbox)
             elif rel == '밀접/친밀':
                 ax.plot([cx + 0.1, sx - 0.1], [cy + 0.015, sy + 0.015], color='#1976D2', lw=1.8, zorder=2)
                 ax.plot([cx + 0.1, sx - 0.1], [cy - 0.015, sy - 0.015], color='#1976D2', lw=1.8, zorder=2)
-                ax.text(mid_x, cy + 0.08, "친밀", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
-                        ha='center', va='center', color='#1976D2', zorder=4, bbox=lbl_bbox)
+                ax.text(mid_x, cy + 0.08, "친밀", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'), ha='center', va='center', color='#1976D2', zorder=4, bbox=lbl_bbox)
             else:
                 ax.plot([cx + 0.1, sx - 0.1], [cy, sy], color='#2D3436', lw=1.5, zorder=2)
 
         if cohabitants and not spouse:
             coh = cohabitants[0]
-            coh_x, coh_y = (0.45, 1.0)
+            coh_x, coh_y = (0.45, 0.85)
             draw_person(coh_x, coh_y, coh['name'], coh['age'], coh['gender'], coh['is_alive'])
             if coh.get('is_cohabit', True): 
                 cohabit_points.append((coh_x, coh_y))
@@ -372,12 +366,11 @@ else:
             mid_x = (cx + coh_x) / 2
             lbl_bbox = dict(boxstyle="round,pad=0.2", fc="#FFFFFF", ec="none", alpha=0.85)
             ax.plot([cx + 0.1, coh_x - 0.1], [cy, coh_y], color='#2E7D32', linestyle=':', lw=1.5, zorder=2)
-            ax.text(mid_x, cy + 0.08, "동거인", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
-                    ha='center', va='center', color='#2E7D32', zorder=4, bbox=lbl_bbox)
+            ax.text(mid_x, cy + 0.08, "동거인", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'), ha='center', va='center', color='#2E7D32', zorder=4, bbox=lbl_bbox)
 
         # 2. 부모님 (1세대)
         if parents:
-            py = 1.45
+            py = 1.30
             father = [p for p in parents if "부" in p['relation']]
             mother = [p for p in parents if "모" in p['relation']]
             p_fx, p_mx = -0.45, 0.45
@@ -398,11 +391,11 @@ else:
                 ax.plot([0, cx], [p_mid_y, p_mid_y], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
                 ax.plot([cx, cx], [p_mid_y, cy + 0.1], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
 
-        # 3. 자녀 세대 배치 (Y = 0.45)
+        # 3. 자녀 세대 배치
         child_coords_map = {}
         if children:
-            chy = 0.45
-            branch_y = 0.72
+            chy = 0.30
+            branch_y = 0.60
             
             family_groups = []
             for ch_idx, ch in enumerate(children):
@@ -449,7 +442,7 @@ else:
                         cohabit_points.append((il_x, chy))
 
                     if grand_children:
-                        gcy = -0.10
+                        gcy = -0.25
                         gc_mid = (ch_x + il_x) / 2
                         ax.plot([gc_mid, gc_mid], [chy, chy - 0.18], color='#2D3436', lw=1.2, zorder=1)
                         
@@ -481,29 +474,25 @@ else:
 
                     if ch_rel == '불화/갈등':
                         ax.plot([chx, chx], [branch_y, chy + 0.1], color='#D63031', linestyle='--', lw=1.5, zorder=2)
-                        ax.text(chx + 0.08, ch_mid_y, "불화", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
-                                ha='left', va='center', color='#D63031', zorder=4, bbox=lbl_bbox_small)
+                        ax.text(chx + 0.08, ch_mid_y, "불화", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'), ha='left', va='center', color='#D63031', zorder=4, bbox=lbl_bbox_small)
                     elif ch_rel == '소원':
                         ax.plot([chx, chx], [branch_y, chy + 0.1], color='#7F8C8D', linestyle='--', lw=1.3, zorder=2)
-                        ax.text(chx + 0.08, ch_mid_y, "소원", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
-                                ha='left', va='center', color='#7F8C8D', zorder=4, bbox=lbl_bbox_small)
+                        ax.text(chx + 0.08, ch_mid_y, "소원", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'), ha='left', va='center', color='#7F8C8D', zorder=4, bbox=lbl_bbox_small)
                     elif ch_rel == '단절':
                         ax.plot([chx, chx], [branch_y, chy + 0.1], color='#2D3436', lw=1.3, zorder=2)
                         ax.plot([chx - 0.03, chx + 0.03], [ch_mid_y - 0.03, ch_mid_y + 0.03], color='#2D3436', lw=1.8, zorder=3)
                         ax.plot([chx - 0.03, chx + 0.03], [ch_mid_y + 0.03, ch_mid_y - 0.03], color='#2D3436', lw=1.8, zorder=3)
-                        ax.text(chx + 0.08, ch_mid_y, "단절", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
-                                ha='left', va='center', color='#2D3436', zorder=4, bbox=lbl_bbox_small)
+                        ax.text(chx + 0.08, ch_mid_y, "단절", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'), ha='left', va='center', color='#2D3436', zorder=4, bbox=lbl_bbox_small)
                     elif ch_rel == '밀접/친밀':
                         ax.plot([chx - 0.015, chx - 0.015], [branch_y, chy + 0.1], color='#1976D2', lw=1.5, zorder=2)
                         ax.plot([chx + 0.015, chx + 0.015], [branch_y, chy + 0.1], color='#1976D2', lw=1.5, zorder=2)
-                        ax.text(chx + 0.08, ch_mid_y, "친밀", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
-                                ha='left', va='center', color='#1976D2', zorder=4, bbox=lbl_bbox_small)
+                        ax.text(chx + 0.08, ch_mid_y, "친밀", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'), ha='left', va='center', color='#1976D2', zorder=4, bbox=lbl_bbox_small)
                     else:
                         ax.plot([chx, chx], [branch_y, chy + 0.1], color='#2D3436', lw=1.3, zorder=1)
 
         # 5. 반려동물
         if pets:
-            pet_y = 0.45 if not children else -0.10
+            pet_y = 0.30 if not children else -0.25
             pet_x = 1.10
             for p_idx, pt in enumerate(pets):
                 px = pet_x - (p_idx * 0.28)
@@ -511,41 +500,109 @@ else:
                 if pt.get('is_cohabit'): 
                     cohabit_points.append((px, pet_y))
 
-        # 6. [핵심 수정: 비동거 가족 절대 피하기 위해 X좌표 범위를 수동 연결하거나, 통합 둥근 버블로 한 번에 감싸기]
+        # 6. [계단식 정밀 유기적 동거 영역] 하나로 묶으면서도 비동거인은 피해서 그리기!
         if len(cohabit_points) > 0:
-            pts = np.array(cohabit_points)
+            y_groups = {}
+            for px, py in cohabit_points:
+                found = False
+                for gy in y_groups.keys():
+                    if abs(gy - py) < 0.1:
+                        y_groups[gy].append(px)
+                        found = True
+                        break
+                if not found:
+                    y_groups[py] = [px]
             
-            # 비동거 가족(장남 등)이 가운데 껴있을 때, 동거인들만 하나로 묶어주는 유기적 통합 박스 (최소/최대 경계 계산)
-            min_x, max_x = min(pts[:, 0]) - 0.22, max(pts[:, 0]) + 0.22
-            min_y, max_y = min(pts[:, 1]) - 0.20, max(pts[:, 1]) + 0.20
-            w, h = max_x - min_x, max_y - min_y
+            sorted_ys = sorted(y_groups.keys(), reverse=True)
             
-            # 만약 장남(X=-0.65 부근)이 비동거이고 홍길동과 차남만 동거인 경우, 
-            # 장남을 침범하지 않도록 왼쪽 경계면을 조정하거나 두 영역을 아우르는 부드러운 박스 생성
-            co_bubble = patches.FancyBboxPatch(
-                (min_x, min_y), w, h,
-                boxstyle="round,pad=0.08,rounding_size=0.15",
-                facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
-            )
-            ax.add_patch(co_bubble)
-            ax.text(min_x + 0.02, max_y + 0.02, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), color='#1B5E20', zorder=1)
+            min_x = {gy: min(y_groups[gy]) - 0.25 for gy in sorted_ys}
+            max_x = {gy: max(y_groups[gy]) + 0.25 for gy in sorted_ys}
+            top_y = {gy: gy + 0.22 for gy in sorted_ys}
+            bot_y = {gy: gy - 0.22 for gy in sorted_ys}
+            
+            verts = []
+            codes = []
+            
+            # 왼쪽 사이드 따라 내려가기
+            for i, gy in enumerate(sorted_ys):
+                mx = min_x[gy]
+                ty = top_y[gy]
+                by = bot_y[gy]
+                
+                if i == 0:
+                    verts.append((mx, ty))
+                    codes.append(mpath.Path.MOVETO)
+                else:
+                    prev_gy = sorted_ys[i-1]
+                    mid_y = (bot_y[prev_gy] + ty) / 2.0
+                    prev_mx = min_x[prev_gy]
+                    verts.append((prev_mx, mid_y))
+                    codes.append(mpath.Path.LINETO)
+                    verts.append((mx, mid_y))
+                    codes.append(mpath.Path.LINETO)
+                    verts.append((mx, ty))
+                    codes.append(mpath.Path.LINETO)
+                    
+                verts.append((mx, by))
+                codes.append(mpath.Path.LINETO)
+                
+            # 오른쪽 사이드 따라 올라오기
+            reversed_ys = list(reversed(sorted_ys))
+            for i, gy in enumerate(reversed_ys):
+                mx = max_x[gy]
+                by = bot_y[gy]
+                ty = top_y[gy]
+                
+                if i == 0:
+                    verts.append((mx, by))
+                    codes.append(mpath.Path.LINETO)
+                else:
+                    prev_gy = reversed_ys[i-1]
+                    mid_y = (top_y[prev_gy] + by) / 2.0
+                    prev_mx = max_x[prev_gy]
+                    verts.append((prev_mx, mid_y))
+                    codes.append(mpath.Path.LINETO)
+                    verts.append((mx, mid_y))
+                    codes.append(mpath.Path.LINETO)
+                    verts.append((mx, by))
+                    codes.append(mpath.Path.LINETO)
+                    
+                verts.append((mx, ty))
+                codes.append(mpath.Path.LINETO)
+                
+            verts.append((min_x[sorted_ys[0]], top_y[sorted_ys[0]]))
+            codes.append(mpath.Path.CLOSEPOLY)
+            
+            path = mpath.Path(verts, codes)
+            # 계단식으로 하나로 이어진 부드러운 다각형 패치 생성!
+            patch = patches.PathPatch(path, facecolor="#E8F5E9", edgecolor="#2E7D32", 
+                                      linestyle="--", linewidth=2.5, alpha=0.35, 
+                                      zorder=0, joinstyle='round', capstyle='round')
+            ax.add_patch(patch)
+            
+            top_y_val = top_y[sorted_ys[0]]
+            mid_x_val = (min_x[sorted_ys[0]] + max_x[sorted_ys[0]]) / 2.0
+            ax.text(mid_x_val, top_y_val + 0.03, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), ha='center', va='bottom', color='#1B5E20', zorder=1)
 
-        ax.text(0, -0.50, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#636E72')
+        # [동적 Y축 스케일링] 빈 공간을 도려내어 최상단에 바짝 붙도록 강제 세팅
+        if all_y_coords:
+            min_y_limit = min(all_y_coords) - 0.35
+            max_y_limit = max(all_y_coords) + 0.45
+            ax.set_ylim(min_y_limit, max_y_limit)
+        else:
+            ax.set_ylim(-0.5, 1.5)
+
+        ax.set_xlim(-1.40, 1.40)
+        ax.text(0, min_y_limit + 0.1, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#636E72')
         
-        # [최상단 밀착] Y축 범위를 더 위로 끌어올림 (0.1 ~ 1.6 구간)
-        ax.set_xlim(-1.60, 1.60)
-        ax.set_ylim(-0.60, 1.60)
         plt.axis("off")
         plt.tight_layout(pad=0.0)
         return fig
 
-    # 우측 상단 적당한 위치에 다운로드 버튼 배치
-    col_g1, col_g2 = st.columns([4, 1])
-    col_g2.markdown("<div style='margin-top: 15px; text-align: right;'>", unsafe_allow_html=True)
     fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members)
-    buf2 = io.BytesIO()
-    fig2.savefig(buf2, format="png", bbox_inches='tight', pad_inches=0.02, dpi=300)
-    col_g2.download_button(label="💾 이미지 다운로드", data=buf2.getvalue(), file_name=f"가계도_{st.session_state.gen_client['name']}.png", mime="image/png", key="dl_geno")
-    col_g2.markdown("</div>", unsafe_allow_html=True)
-
     st.pyplot(fig2, use_container_width=False)
+    
+    # 다운로드 버튼을 차트 바로 밑으로 빼서 안정적으로 찾기 쉽게 배치
+    buf2 = io.BytesIO()
+    fig2.savefig(buf2, format="png", bbox_inches='tight', pad_inches=0.05, dpi=300)
+    st.download_button(label="💾 가계도 이미지 다운로드", data=buf2.getvalue(), file_name=f"가계도_{st.session_state.gen_client['name']}.png", mime="image/png", key="dl_geno")
