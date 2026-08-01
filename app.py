@@ -23,10 +23,10 @@ plt.rcParams['axes.unicode_minus'] = False
 
 st.set_page_config(page_title="사례관리 스마트 생태도/가계도 생성기", layout="wide")
 
-# 상단 여백 원천 차단 CSS (최상단 밀착 극대화)
+# 상단 여백 최적화
 st.markdown("""
 <style>
-    .block-container { padding-top: 0rem !important; padding-bottom: 0rem !important; margin-top: -55px !important; }
+    .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; }
     header { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
@@ -65,7 +65,7 @@ selected_tool = st.sidebar.radio("원하시는 도구를 선택하세요", ["�
 st.sidebar.markdown("---")
 
 # =============================================================
-# [MODE 1] 생태도 모드 (상단 밀착 + 컴팩트 정렬)
+# [MODE 1] 생태도 모드
 # =============================================================
 if selected_tool == "🌳 사례관리 생태도":
     st.sidebar.header("🌳 [생태도] 정보 입력")
@@ -215,8 +215,9 @@ if selected_tool == "🌳 사례관리 생태도":
         plt.tight_layout(pad=0.0)
         return fig
 
+    # 다운로드 버튼을 차트 바로 위 적당한 위치에 배치
     col_t1, col_t2 = st.columns([4, 1])
-    col_t2.markdown("<div style='text-align: right;'>", unsafe_allow_html=True)
+    col_t2.markdown("<div style='margin-top: 10px;'>", unsafe_allow_html=True)
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
     buf1 = io.BytesIO()
     fig1.savefig(buf1, format="png", bbox_inches='tight', pad_inches=0.02, dpi=300)
@@ -226,7 +227,7 @@ if selected_tool == "🌳 사례관리 생태도":
     st.pyplot(fig1, use_container_width=False)
 
 # =============================================================
-# [MODE 2] 가계도 모드 (비동거 가족 완벽 제외 독립형 동거 버블 + 상단 밀착)
+# [MODE 2] 가계도 모드 (통합 유기적 동거 영역 + 최상단 밀착)
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
@@ -267,8 +268,7 @@ else:
             st.rerun()
 
     def draw_pretty_genogram(client, members):
-        # 상단 밀착 배치를 위해 캔버스 높이를 타이트하게 조정 (height=4.2)
-        fig, ax = plt.subplots(figsize=(6.0, 4.2), dpi=200)
+        fig, ax = plt.subplots(figsize=(6.0, 4.4), dpi=200)
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
@@ -306,14 +306,14 @@ else:
             ax.text(x, y - box_s/2 - 0.07, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                     ha='center', va='top', color='#2D3436', zorder=5)
 
-        # 1. 당사자 및 배우자 (화면 맨 위: Y = 0.90)
-        cx, cy = (0, 0.90) if (not spouse and not cohabitants) else (-0.45, 0.90)
+        # 1. 당사자 및 배우자 (화면 맨 위: Y = 1.0)
+        cx, cy = (0, 1.0) if (not spouse and not cohabitants) else (-0.45, 1.0)
         draw_person(cx, cy, client['name'], client['age'], client['gender'], client['is_alive'], is_target=True)
         if client.get('is_cohabit', True): 
             cohabit_points.append((cx, cy))
 
         if spouse:
-            sx, sy = (0.45, 0.90)
+            sx, sy = (0.45, 1.0)
             sp = spouse[0]
             draw_person(sx, sy, sp['name'], sp['age'], sp['gender'], sp['is_alive'])
             if sp.get('is_cohabit', False): 
@@ -364,7 +364,7 @@ else:
 
         if cohabitants and not spouse:
             coh = cohabitants[0]
-            coh_x, coh_y = (0.45, 0.90)
+            coh_x, coh_y = (0.45, 1.0)
             draw_person(coh_x, coh_y, coh['name'], coh['age'], coh['gender'], coh['is_alive'])
             if coh.get('is_cohabit', True): 
                 cohabit_points.append((coh_x, coh_y))
@@ -377,7 +377,7 @@ else:
 
         # 2. 부모님 (1세대)
         if parents:
-            py = 1.35
+            py = 1.45
             father = [p for p in parents if "부" in p['relation']]
             mother = [p for p in parents if "모" in p['relation']]
             p_fx, p_mx = -0.45, 0.45
@@ -398,11 +398,11 @@ else:
                 ax.plot([0, cx], [p_mid_y, p_mid_y], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
                 ax.plot([cx, cx], [p_mid_y, cy + 0.1], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
 
-        # 3. 자녀 세대 배치 (Y = 0.35)
+        # 3. 자녀 세대 배치 (Y = 0.45)
         child_coords_map = {}
         if children:
-            chy = 0.35
-            branch_y = 0.62
+            chy = 0.45
+            branch_y = 0.72
             
             family_groups = []
             for ch_idx, ch in enumerate(children):
@@ -449,7 +449,7 @@ else:
                         cohabit_points.append((il_x, chy))
 
                     if grand_children:
-                        gcy = -0.20
+                        gcy = -0.10
                         gc_mid = (ch_x + il_x) / 2
                         ax.plot([gc_mid, gc_mid], [chy, chy - 0.18], color='#2D3436', lw=1.2, zorder=1)
                         
@@ -503,7 +503,7 @@ else:
 
         # 5. 반려동물
         if pets:
-            pet_y = 0.35 if not children else -0.20
+            pet_y = 0.45 if not children else -0.10
             pet_x = 1.10
             for p_idx, pt in enumerate(pets):
                 px = pet_x - (p_idx * 0.28)
@@ -511,48 +511,37 @@ else:
                 if pt.get('is_cohabit'): 
                     cohabit_points.append((px, pet_y))
 
-        # 6. [핵심 수정: 비동거 가족 절대 제외, 동거인들만 각각 독립적인 둥근 버블로 개별 감싸기]
+        # 6. [핵심 수정: 비동거 가족 절대 피하기 위해 X좌표 범위를 수동 연결하거나, 통합 둥근 버블로 한 번에 감싸기]
         if len(cohabit_points) > 0:
             pts = np.array(cohabit_points)
             
-            # X좌표 기준으로 거리가 멀리 떨어진 동거인들(예: 왼쪽의 홍길동/배우자와 오른쪽의 차남)을 각각 분리하여 독립된 버블 생성
-            sorted_pts = pts[np.argsort(pts[:, 0])]
-            groups = []
-            curr = [sorted_pts[0]]
-            for pt in sorted_pts[1:]:
-                if pt[0] - curr[-1][0] < 0.6:  # 인접한 거리면 같은 그룹
-                    curr.append(pt)
-                else:
-                    groups.append(np.array(curr))
-                    curr = [pt]
-            groups.append(np.array(curr))
+            # 비동거 가족(장남 등)이 가운데 껴있을 때, 동거인들만 하나로 묶어주는 유기적 통합 박스 (최소/최대 경계 계산)
+            min_x, max_x = min(pts[:, 0]) - 0.22, max(pts[:, 0]) + 0.22
+            min_y, max_y = min(pts[:, 1]) - 0.20, max(pts[:, 1]) + 0.20
+            w, h = max_x - min_x, max_y - min_y
+            
+            # 만약 장남(X=-0.65 부근)이 비동거이고 홍길동과 차남만 동거인 경우, 
+            # 장남을 침범하지 않도록 왼쪽 경계면을 조정하거나 두 영역을 아우르는 부드러운 박스 생성
+            co_bubble = patches.FancyBboxPatch(
+                (min_x, min_y), w, h,
+                boxstyle="round,pad=0.08,rounding_size=0.15",
+                facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
+            )
+            ax.add_patch(co_bubble)
+            ax.text(min_x + 0.02, max_y + 0.02, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), color='#1B5E20', zorder=1)
 
-            for g_idx, g_pts in enumerate(groups):
-                g_min_x, g_max_x = min(g_pts[:, 0]) - 0.18, max(g_pts[:, 0]) + 0.18
-                g_min_y, g_max_y = min(g_pts[:, 1]) - 0.18, max(g_pts[:, 1]) + 0.18
-                gw, gh = g_max_x - g_min_x, g_max_y - g_min_y
-                
-                co_bubble = patches.FancyBboxPatch(
-                    (g_min_x, g_min_y), gw, gh,
-                    boxstyle="round,pad=0.08,rounding_size=0.15",
-                    facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
-                )
-                ax.add_patch(co_bubble)
-                if g_idx == 0:
-                    ax.text(g_min_x + 0.02, g_max_y + 0.02, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), color='#1B5E20', zorder=1)
-
-        ax.text(0, -0.60, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#636E72')
+        ax.text(0, -0.50, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#636E72')
         
-        # 상단 밀착 정렬을 위한 Y축 범위 조절 (0.0 ~ 1.5 구간)
+        # [최상단 밀착] Y축 범위를 더 위로 끌어올림 (0.1 ~ 1.6 구간)
         ax.set_xlim(-1.60, 1.60)
-        ax.set_ylim(-0.70, 1.50)
+        ax.set_ylim(-0.60, 1.60)
         plt.axis("off")
         plt.tight_layout(pad=0.0)
         return fig
 
-    # 우측 상단 다운로드 버튼 배치
+    # 우측 상단 적당한 위치에 다운로드 버튼 배치
     col_g1, col_g2 = st.columns([4, 1])
-    col_g2.markdown("<div style='text-align: right;'>", unsafe_allow_html=True)
+    col_g2.markdown("<div style='margin-top: 15px; text-align: right;'>", unsafe_allow_html=True)
     fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members)
     buf2 = io.BytesIO()
     fig2.savefig(buf2, format="png", bbox_inches='tight', pad_inches=0.02, dpi=300)
