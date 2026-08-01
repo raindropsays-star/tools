@@ -24,12 +24,18 @@ plt.rcParams['axes.unicode_minus'] = False
 
 st.set_page_config(page_title="사례관리 스마트 생태도/가계도 생성기", layout="wide")
 
-# 상단 여백 제거 + 화면 전환 시 찌그러지는 애니메이션(잔상) 원천 차단
+# [핵심] 스케일 유지 + 스크롤 방지를 위해 스트림릿의 숨겨진 모든 수직 여백을 극한으로 깎아냅니다.
 st.markdown("""
 <style>
-    .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; margin-top: -30px !important; }
-    header { visibility: hidden; }
+    .block-container { 
+        padding-top: 0rem !important; 
+        padding-bottom: 0rem !important; 
+        margin-top: -50px !important; 
+    }
+    header { display: none !important; }
     div[data-testid="column"] { transition: none !important; } 
+    /* 이미지와 다운로드 버튼 사이의 불필요한 간격을 없애 버튼을 위로 끌어올립니다. */
+    div[data-testid="stImage"] { margin-bottom: -1.5rem !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -201,9 +207,9 @@ if selected_tool == "🌳 사례관리 생태도":
 
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
     
-    col_e1, col_e2, col_e3 = st.columns([1, 3.2, 1])
+    # [비율 고정] 3.0~3.1 비율로 화면에 꽉 차면서도 스크롤을 유발하지 않도록 최적화
+    col_e1, col_e2, col_e3 = st.columns([1, 3.0, 1])
     with col_e2:
-        # [해결] st.pyplot 대신 빈 여백이 잘려나간 st.image로 렌더링하여 버튼을 위로 끌어올림!
         buf1 = io.BytesIO()
         fig1.savefig(buf1, format="png", bbox_inches='tight', pad_inches=0.0, dpi=300)
         st.image(buf1, use_container_width=True)
@@ -385,7 +391,6 @@ else:
             group_count = len(family_groups)
             parent_mid_x = (cx + (sx if spouse else (coh_x if cohabitants else cx))) / 2
             
-            # [해결] 자녀가 많아도 화면 밖으로 나가지 않도록 스마트 비율 계산 적용
             if group_count == 1:
                 group_xs = [parent_mid_x]
             else:
@@ -472,7 +477,7 @@ else:
                 draw_person(px, pet_y, pt['name'], pt['age'], pt['gender'], pt['is_alive'])
                 if pt.get('is_cohabit'): cohabit_points.append((px, pet_y))
 
-        # 6. [해결] 다각형 하단 확장 및 관계선 교차 방지 로직
+        # 6. 다각형 하단 확장 및 관계선 교차 방지 로직
         if len(cohabit_points) > 0:
             y_groups = {}
             for px, py in cohabit_points:
@@ -491,26 +496,22 @@ else:
             max_x = {gy: max(y_groups[gy]) + 0.24 for gy in sorted_ys}
             top_y = {gy: gy + 0.22 for gy in sorted_ys}
             
-            # [수학적 분리] 1세대(0.85)의 다각형 하단선은 검은 관계선(0.55)과 만나지 않도록 조정하고, 
-            # 자녀(0.35) 세대는 텍스트를 덮지 않도록 과감히 아래로(-0.32) 확장합니다.
             bot_y = {}
             for gy in sorted_ys:
                 if abs(gy - 0.85) < 0.1: 
-                    bot_y[gy] = gy - 0.24 # 부모 세대 하단 여백
+                    bot_y[gy] = gy - 0.24 
                 else: 
-                    bot_y[gy] = gy - 0.32 # 자녀/손자 세대 하단 여백 (이름 침범 방지)
+                    bot_y[gy] = gy - 0.32 
 
             bridge_y = {}
             for i in range(1, len(sorted_ys)):
                 top_layer = sorted_ys[i-1]
                 bot_layer = sorted_ys[i]
-                # 층과 층을 이어주는 세로 다각형 선의 높이 계산 (겹침 방지)
                 bridge_y[(top_layer, bot_layer)] = (bot_y[top_layer] + top_y[bot_layer]) / 2.0
 
             verts = []
             codes = []
             
-            # 다각형 왼쪽 외곽선
             for i, gy in enumerate(sorted_ys):
                 mx = min_x[gy]
                 ty = top_y[gy]
@@ -531,7 +532,6 @@ else:
                 verts.append((mx, by))
                 codes.append(mpath.Path.LINETO)
                 
-            # 다각형 오른쪽 외곽선
             reversed_ys = list(reversed(sorted_ys))
             for i, gy in enumerate(reversed_ys):
                 mx = max_x[gy]
@@ -575,9 +575,8 @@ else:
 
     fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members)
     
-    col_g1, col_g2, col_g3 = st.columns([1, 3.2, 1])
+    col_g1, col_g2, col_g3 = st.columns([1, 3.0, 1])
     with col_g2:
-        # 빈 여백을 정밀하게 제거한 렌더링으로 버튼 위치 바짝 끌어올림
         buf2 = io.BytesIO()
         fig2.savefig(buf2, format="png", bbox_inches='tight', pad_inches=0.0, dpi=300)
         st.image(buf2, use_container_width=True)
