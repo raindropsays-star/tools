@@ -128,7 +128,6 @@ if selected_tool == "🌳 사례관리 생태도":
         return center_x + dx * scale, center_y + dy * scale
 
     def draw_pretty_ecomap(nodes, client_name):
-        # [버튼 밀착 처리] 1:1 완벽한 비율로 내부 여백을 원천 차단
         fig, ax = plt.subplots(figsize=(5.5, 5.5), dpi=200)
         ax.set_aspect('equal')
         fig.patch.set_facecolor('#FFFFFF')
@@ -194,22 +193,20 @@ if selected_tool == "🌳 사례관리 생태도":
             arrow_patch = patches.FancyArrowPatch(p_from, p_to, arrowstyle=a_style, linestyle=style, linewidth=lw, color=color, mutation_scale=8.5, zorder=5)
             ax.add_patch(arrow_patch)
 
-        # 빈 여백 발생을 막기 위해 figsize 1:1 비율과 x,y 좌표계를 완전히 일치시킵니다.
         ax.set_xlim(-1.25, 1.25)
         ax.set_ylim(-1.25, 1.25)
-        
         plt.axis("off")
-        fig.tight_layout(pad=0.0) # 내부 패딩 완벽 제거
+        fig.tight_layout(pad=0.0) 
         return fig
 
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
     
-    # [비율 고정] 가장 보기 좋았던 3.2 황금 비율 적용
     col_e1, col_e2, col_e3 = st.columns([1, 3.2, 1])
     with col_e2:
-        st.pyplot(fig1, use_container_width=True)
+        # [해결] st.pyplot 대신 빈 여백이 잘려나간 st.image로 렌더링하여 버튼을 위로 끌어올림!
         buf1 = io.BytesIO()
         fig1.savefig(buf1, format="png", bbox_inches='tight', pad_inches=0.0, dpi=300)
+        st.image(buf1, use_container_width=True)
         st.download_button(label="💾 생태도 이미지 다운로드", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png", use_container_width=True)
 
 # =============================================================
@@ -254,8 +251,7 @@ else:
             st.rerun()
 
     def draw_pretty_genogram(client, members):
-        # [버튼 밀착 처리] 가계도 역시 빈 흰색 여백이 없도록 1.4 비율(7.0x5.0)로 설정합니다.
-        fig, ax = plt.subplots(figsize=(7.0, 5.0), dpi=200)
+        fig, ax = plt.subplots(figsize=(5.5, 5.5), dpi=200)
         ax.set_aspect('equal') 
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
@@ -291,7 +287,6 @@ else:
                 ax.plot([x - box_s/2.2, x + box_s/2.2], [y + box_s/2.2, y - box_s/2.2], color='#D63031', lw=1.8, zorder=5)
 
             disp_txt = f"{name}\n({age}세)" if is_alive else f"{name}\n(사망)"
-            # [이름 겹침 방지] 글씨를 도형 쪽에 완전히 바짝 붙여 밑에 지나가는 선들과의 충돌을 예방합니다.
             ax.text(x, y - box_s/2 - 0.03, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                     ha='center', va='top', color='#2D3436', zorder=5)
 
@@ -373,11 +368,10 @@ else:
                 ax.plot([0, cx], [p_mid_y, p_mid_y], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
                 ax.plot([cx, cx], [p_mid_y, cy + 0.1], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
 
-        # 3. 자녀 세대 배치 (선 겹침 방지를 위해 branch_y 위치 조정)
+        # 3. 자녀 세대 배치 (선 겹침 및 간격 자동 조절 로직)
         child_coords_map = {}
         if children:
             chy = 0.35
-            # [선 겹침 해결] 부모-자식 간의 가로 관계선(검은선) 높이를 0.55로 설정
             branch_y = 0.55 
             
             family_groups = []
@@ -391,13 +385,13 @@ else:
             group_count = len(family_groups)
             parent_mid_x = (cx + (sx if spouse else (coh_x if cohabitants else cx))) / 2
             
-            x_min = -1.25 if group_count >= 3 else -0.65
-            x_max = 1.25 if group_count >= 3 else 0.65
-
+            # [해결] 자녀가 많아도 화면 밖으로 나가지 않도록 스마트 비율 계산 적용
             if group_count == 1:
                 group_xs = [parent_mid_x]
             else:
-                group_xs = list(np.linspace(x_min, x_max, group_count))
+                spacing = min(0.55, 3.0 / (group_count - 1))
+                total_w = spacing * (group_count - 1)
+                group_xs = list(np.linspace(parent_mid_x - total_w/2, parent_mid_x + total_w/2, group_count))
 
             for g_idx, group in enumerate(family_groups):
                 gx = group_xs[g_idx]
@@ -448,7 +442,6 @@ else:
                 for ch_idx, ch in enumerate(children):
                     chx = child_coords_map[ch_idx]
                     ch_rel = ch.get('rel_type', '보통')
-                    # 자녀에게 내려오는 선분 중간에 표식을 위해 중심점 계산
                     ch_mid_y = (branch_y + (chy + 0.1)) / 2 
                     lbl_bbox_small = dict(boxstyle="round,pad=0.15", fc="#FFFFFF", ec="none", alpha=0.85)
 
@@ -479,7 +472,7 @@ else:
                 draw_person(px, pet_y, pt['name'], pt['age'], pt['gender'], pt['is_alive'])
                 if pt.get('is_cohabit'): cohabit_points.append((px, pet_y))
 
-        # 6. 동거 영역 다각형 로직
+        # 6. [해결] 다각형 하단 확장 및 관계선 교차 방지 로직
         if len(cohabit_points) > 0:
             y_groups = {}
             for px, py in cohabit_points:
@@ -494,17 +487,25 @@ else:
             
             sorted_ys = sorted(y_groups.keys(), reverse=True)
             
-            min_x = {gy: min(y_groups[gy]) - 0.22 for gy in sorted_ys}
-            max_x = {gy: max(y_groups[gy]) + 0.22 for gy in sorted_ys}
-            top_y = {gy: gy + 0.20 for gy in sorted_ys}
-            bot_y = {gy: gy - 0.20 for gy in sorted_ys}
+            min_x = {gy: min(y_groups[gy]) - 0.24 for gy in sorted_ys}
+            max_x = {gy: max(y_groups[gy]) + 0.24 for gy in sorted_ys}
+            top_y = {gy: gy + 0.22 for gy in sorted_ys}
             
-            # [선 겹침 해결] 초록색 다각형의 수평선을 검은 선(0.55)과 만나지 않도록 (0.62 위치로) 분리합니다.
+            # [수학적 분리] 1세대(0.85)의 다각형 하단선은 검은 관계선(0.55)과 만나지 않도록 조정하고, 
+            # 자녀(0.35) 세대는 텍스트를 덮지 않도록 과감히 아래로(-0.32) 확장합니다.
+            bot_y = {}
+            for gy in sorted_ys:
+                if abs(gy - 0.85) < 0.1: 
+                    bot_y[gy] = gy - 0.24 # 부모 세대 하단 여백
+                else: 
+                    bot_y[gy] = gy - 0.32 # 자녀/손자 세대 하단 여백 (이름 침범 방지)
+
             bridge_y = {}
             for i in range(1, len(sorted_ys)):
                 top_layer = sorted_ys[i-1]
                 bot_layer = sorted_ys[i]
-                bridge_y[(top_layer, bot_layer)] = bot_y[top_layer] - 0.03
+                # 층과 층을 이어주는 세로 다각형 선의 높이 계산 (겹침 방지)
+                bridge_y[(top_layer, bot_layer)] = (bot_y[top_layer] + top_y[bot_layer]) / 2.0
 
             verts = []
             codes = []
@@ -565,20 +566,19 @@ else:
             mid_x_val = (min_x[sorted_ys[0]] + max_x[sorted_ys[0]]) / 2.0
             ax.text(mid_x_val, top_y_val + 0.03, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), ha='center', va='bottom', color='#1B5E20', zorder=1)
 
-        # 빈 여백을 방지하기 위해 1.4 Aspect Ratio(7.0 x 5.0)와 정확히 일치하는 좌표계 제한 적용
-        ax.set_xlim(-1.40, 1.40) # 폭 2.8
-        ax.set_ylim(-0.45, 1.55) # 높이 2.0 (2.8 / 2.0 = 1.4 비율 완성)
+        ax.set_xlim(-1.65, 1.65)
+        ax.set_ylim(-1.80, 1.50)
         
         plt.axis("off")
-        fig.tight_layout(pad=0.0) # 내부 패딩 완벽 제거
+        fig.tight_layout(pad=0.0) 
         return fig
 
     fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members)
     
-    # [비율 고정] 생태도와 동일한 3.2 비율 적용 및 깜빡임 원천 차단
     col_g1, col_g2, col_g3 = st.columns([1, 3.2, 1])
     with col_g2:
-        st.pyplot(fig2, use_container_width=True)
+        # 빈 여백을 정밀하게 제거한 렌더링으로 버튼 위치 바짝 끌어올림
         buf2 = io.BytesIO()
         fig2.savefig(buf2, format="png", bbox_inches='tight', pad_inches=0.0, dpi=300)
+        st.image(buf2, use_container_width=True)
         st.download_button(label="💾 가계도 이미지 다운로드", data=buf2.getvalue(), file_name=f"가계도_{st.session_state.gen_client['name']}.png", mime="image/png", use_container_width=True)
