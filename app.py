@@ -128,7 +128,6 @@ if selected_tool == "🌳 사례관리 생태도":
         return center_x + dx * scale, center_y + dy * scale
 
     def draw_pretty_ecomap(nodes, client_name):
-        # [스케일 통일] 가계도와 완벽히 동일한 5.5 x 5.5 캔버스
         fig, ax = plt.subplots(figsize=(5.5, 5.5), dpi=200)
         ax.set_aspect('equal')
         fig.patch.set_facecolor('#FFFFFF')
@@ -194,10 +193,6 @@ if selected_tool == "🌳 사례관리 생태도":
             arrow_patch = patches.FancyArrowPatch(p_from, p_to, arrowstyle=a_style, linestyle=style, linewidth=lw, color=color, mutation_scale=8.5, zorder=5)
             ax.add_patch(arrow_patch)
 
-        # 하단 주석 완전 삭제
-        # ax.text(...) 구문 제거 완료
-
-        # 완벽한 정사각형 비율 유지
         ax.set_xlim(-1.25, 1.25)
         ax.set_ylim(-1.25, 1.25)
         plt.axis("off")
@@ -206,8 +201,8 @@ if selected_tool == "🌳 사례관리 생태도":
 
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
     
-    # [레이아웃 통일] 가계도와 완벽히 동일한 [1, 2.5, 1] 비율 적용
-    col_e1, col_e2, col_e3 = st.columns([1, 2.5, 1])
+    # [수정포인트] 레이아웃 통일 및 스케일업 (2.5 -> 4로 확장)
+    col_e1, col_e2, col_e3 = st.columns([1, 4, 1])
     with col_e2:
         st.pyplot(fig1, use_container_width=True)
         buf1 = io.BytesIO()
@@ -256,7 +251,6 @@ else:
             st.rerun()
 
     def draw_pretty_genogram(client, members):
-        # [스케일 통일] 생태도와 완벽히 동일한 5.5 x 5.5 정사각형 캔버스
         fig, ax = plt.subplots(figsize=(5.5, 5.5), dpi=200)
         ax.set_aspect('equal') 
         fig.patch.set_facecolor('#FFFFFF')
@@ -296,7 +290,7 @@ else:
             ax.text(x, y - box_s/2 - 0.07, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                     ha='center', va='top', color='#2D3436', zorder=5)
 
-        # [Top-Align] 가계도를 위에서부터 그립니다. Y좌표의 기준점을 0.85로 세팅합니다.
+        # 1. 당사자 및 배우자
         cx, cy = (0, 0.85) if (not spouse and not cohabitants) else (-0.45, 0.85)
         draw_person(cx, cy, client['name'], client['age'], client['gender'], client['is_alive'], is_target=True)
         if client.get('is_cohabit', True): cohabit_points.append((cx, cy))
@@ -479,7 +473,7 @@ else:
                 draw_person(px, pet_y, pt['name'], pt['age'], pt['gender'], pt['is_alive'])
                 if pt.get('is_cohabit'): cohabit_points.append((px, pet_y))
 
-        # 6. [동거가족 유지] 비동거인은 완벽히 피하는 부드러운 '계단식 다각형(Step Polygon)'
+        # 6. 동거 영역 다각형 로직
         if len(cohabit_points) > 0:
             y_groups = {}
             for px, py in cohabit_points:
@@ -502,7 +496,6 @@ else:
             verts = []
             codes = []
             
-            # 왼쪽 사이드 점선 따라가기
             for i, gy in enumerate(sorted_ys):
                 mx = min_x[gy]
                 ty = top_y[gy]
@@ -523,7 +516,6 @@ else:
                 verts.append((mx, by))
                 codes.append(mpath.Path.LINETO)
                 
-            # 오른쪽 사이드 점선 따라가기
             reversed_ys = list(reversed(sorted_ys))
             for i, gy in enumerate(reversed_ys):
                 mx = max_x[gy]
@@ -558,11 +550,8 @@ else:
             mid_x_val = (min_x[sorted_ys[0]] + max_x[sorted_ys[0]]) / 2.0
             ax.text(mid_x_val, top_y_val + 0.03, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), ha='center', va='bottom', color='#1B5E20', zorder=1)
 
-        # 하단 주석 완전 삭제
-        # ax.text(...) 구문 제거 완료
+        # ax.text(...) 하단 주석 제거 완료
 
-        # [수학적 비율 고정] 생태도와 완벽히 똑같은 1:1 비율 세팅 (폭 3.3 = 1.65+1.65, 높이 3.3 = 1.8+1.5)
-        # 1-2세대를 위쪽에 매달리게 하기 위해 Y의 위를 1.5, 아래 빈공간을 -1.8로 둡니다.
         ax.set_xlim(-1.65, 1.65)
         ax.set_ylim(-1.80, 1.50)
         
@@ -572,8 +561,8 @@ else:
 
     fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members)
     
-    # [레이아웃 통일] 생태도와 완벽히 동일한 [1, 2.5, 1] 비율 적용 (깜빡임 완벽 제거)
-    col_g1, col_g2, col_g3 = st.columns([1, 2.5, 1])
+    # [레이아웃 통일 및 스케일업] 생태도와 완벽히 동일한 [1, 4, 1] 비율 적용 (깜빡임 완벽 제거)
+    col_g1, col_g2, col_g3 = st.columns([1, 4, 1])
     with col_g2:
         st.pyplot(fig2, use_container_width=True)
         buf2 = io.BytesIO()
