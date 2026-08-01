@@ -24,7 +24,7 @@ plt.rcParams['axes.unicode_minus'] = False
 
 st.set_page_config(page_title="사례관리 스마트 생태도/가계도 생성기", layout="wide")
 
-# 상단 여백을 깔끔하게 제거하여 화면 맨 위로 끌어올림
+# 상단 여백을 제거하여 화면 맨 위로 끌어올림
 st.markdown("""
 <style>
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; margin-top: -30px !important; }
@@ -127,9 +127,8 @@ if selected_tool == "🌳 사례관리 생태도":
         return center_x + dx * scale, center_y + dy * scale
 
     def draw_pretty_ecomap(nodes, client_name):
-        # [수정] 스케일을 4.0 x 4.0으로 줄여서 한 화면에 아담하게 쏙 들어오게 함
-        fig, ax = plt.subplots(figsize=(4.0, 4.0), dpi=200)
-        ax.set_aspect('equal') # 비율 고정 (절대 찌그러지지 않음)
+        fig, ax = plt.subplots(figsize=(5.5, 5.5), dpi=200)
+        ax.set_aspect('equal')
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
@@ -195,7 +194,6 @@ if selected_tool == "🌳 사례관리 생태도":
 
         ax.text(0, -1.15, "↔ 쌍방향·강함     ➔ 일방향·보통     ---> 점선·약함", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#2D3436')
         
-        # 내부 좌표 제한을 타이트하게 잡아 빈 여백을 도려냄
         ax.set_xlim(-1.20, 1.20)
         ax.set_ylim(-1.20, 1.20)
         plt.axis("off")
@@ -204,18 +202,17 @@ if selected_tool == "🌳 사례관리 생태도":
 
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
     
-    # [수정] 레이아웃 너비를 확 좁혀서 그림이 너무 커지는 것을 원천 차단 (스크롤 방지)
-    col_e1, col_e2, col_e3 = st.columns([1, 1.5, 1])
+    # [수정 포인트] [1, 3, 1] 비율로 주어 너무 작지도, 너무 크지도 않은 완벽한 중간 사이즈를 구현합니다.
+    col_e1, col_e2, col_e3 = st.columns([1, 3, 1])
     with col_e2:
         st.pyplot(fig1, use_container_width=True)
         
-        # 다운로드 버튼을 그림 바로 아래 중앙에 배치
         buf1 = io.BytesIO()
         fig1.savefig(buf1, format="png", bbox_inches='tight', pad_inches=0.02, dpi=300)
         st.download_button(label="💾 생태도 이미지 다운로드", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png", use_container_width=True)
 
 # =============================================================
-# [MODE 2] 가계도 모드 (계단식 다각형 완벽 복구 + 아담한 스케일 축소)
+# [MODE 2] 가계도 모드 (완벽한 다각형 로직 + 중간 사이즈 스케일)
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
@@ -256,9 +253,9 @@ else:
             st.rerun()
 
     def draw_pretty_genogram(client, members):
-        # [수정] 수학적으로 완벽한 1:1 비율을 유지하면서 크기를 아담하게 축소 (스크롤 방지)
-        fig, ax = plt.subplots(figsize=(6.0, 4.07), dpi=200) # 가로:세로 = 2.8 : 1.9 (비율 1.47)
-        ax.set_aspect('equal') # 절대 찌그러지거나 늘어나지 않음
+        # 비율(Aspect)을 정확히 수학적으로 매칭! (가로 2.8 : 세로 1.9 = 1.473 비율)
+        fig, ax = plt.subplots(figsize=(7.35, 5.0), dpi=200)
+        ax.set_aspect('equal') # 찌그러짐 방지
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
@@ -479,7 +476,7 @@ else:
                 draw_person(px, pet_y, pt['name'], pt['age'], pt['gender'], pt['is_alive'])
                 if pt.get('is_cohabit'): cohabit_points.append((px, pet_y))
 
-        # 6. [100% 복구 완료] 비동거인은 피해서 부드럽게 이어지는 '계단식 다각형(Step Polygon)' 동거 영역!!
+        # 6. [동거가족 완벽 복구] 비동거인은 피해서 ㄷ자 계단형태로 부드럽게 이어지는 다각형(Step Polygon)
         if len(cohabit_points) > 0:
             y_groups = {}
             for px, py in cohabit_points:
@@ -502,7 +499,7 @@ else:
             verts = []
             codes = []
             
-            # 왼쪽 사이드 점선 따라가기
+            # 왼쪽 사이드 점선
             for i, gy in enumerate(sorted_ys):
                 mx = min_x[gy]
                 ty = top_y[gy]
@@ -523,7 +520,7 @@ else:
                 verts.append((mx, by))
                 codes.append(mpath.Path.LINETO)
                 
-            # 오른쪽 사이드 점선 따라가기
+            # 오른쪽 사이드 점선
             reversed_ys = list(reversed(sorted_ys))
             for i, gy in enumerate(reversed_ys):
                 mx = max_x[gy]
@@ -561,7 +558,7 @@ else:
 
         ax.text(0, -0.38, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#636E72')
         
-        # [수학적 비율 고정] 가로세로 1.47 비율에 정확히 맞춰서 잘라냄 -> 찌그러짐 원천 차단!
+        # [수학적 비율 고정] 가로세로 1.47 비율에 정확히 맞춰서 잘라냄 (-1.4~1.4, -0.45~1.45)
         ax.set_xlim(-1.40, 1.40)
         ax.set_ylim(-0.45, 1.45)
         
@@ -571,12 +568,11 @@ else:
 
     fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members)
     
-    # [수정] 레이아웃 너비를 좁혀서 스크롤 없이 한 화면에 다 들어가도록 조절
-    col_g1, col_g2, col_g3 = st.columns([1, 1.5, 1])
+    # [수정 포인트] [1, 3, 1] 비율로 주어 너무 작지도, 너무 크지도 않은 완벽한 중간 사이즈를 구현합니다.
+    col_g1, col_g2, col_g3 = st.columns([1, 3, 1])
     with col_g2:
         st.pyplot(fig2, use_container_width=True)
         
-        # 다운로드 버튼을 그림 바로 아래 정중앙에 편안하게 배치
         buf2 = io.BytesIO()
         fig2.savefig(buf2, format="png", bbox_inches='tight', pad_inches=0.02, dpi=300)
         st.download_button(label="💾 가계도 이미지 다운로드", data=buf2.getvalue(), file_name=f"가계도_{st.session_state.gen_client['name']}.png", mime="image/png", use_container_width=True)
