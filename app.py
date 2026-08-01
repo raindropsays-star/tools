@@ -201,12 +201,12 @@ if selected_tool == "🌳 사례관리 생태도":
 
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
     
-    # [수정포인트] 딱 중간 사이즈인 3.2 비율 적용
-    col_e1, col_e2, col_e3 = st.columns([1, 3.2, 1])
+    col_e1, col_e2, col_e3 = st.columns([1, 4, 1])
     with col_e2:
-        st.pyplot(fig1, use_container_width=True)
+        # [수정] 빈 여백이 제거된 타이트한 이미지를 화면에 렌더링하여 버튼을 위로 끌어올림
         buf1 = io.BytesIO()
         fig1.savefig(buf1, format="png", bbox_inches='tight', pad_inches=0.02, dpi=300)
+        st.image(buf1, use_container_width=True)
         st.download_button(label="💾 생태도 이미지 다운로드", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png", use_container_width=True)
 
 # =============================================================
@@ -230,7 +230,7 @@ else:
         f_name = st.text_input("이름/호칭 (예: 장남, 큰며느리, 차남 등)")
         f_gender = st.radio("성별", ["남성", "여성", "기타(반려동물)"], horizontal=True, key="fam_gender")
         f_age = st.text_input("나이 (사망 시 '사망' 입력)")
-        f_rel_type = st.selectbox("당사자/가족과의 관계 상태", ["동거/혼인", "사실혼", "동거인", "별거", "이혼", "불화/갈등", "소원", "단절", "보통", "밀접/친밀"])
+        f_rel_type = st.selectbox("당사자/가족과의 관계 상태", ["혼인", "사실혼", "동거인", "별거", "이혼", "불화/갈등", "소원", "단절", "보통", "밀접/친밀"])
         f_cohabit = st.checkbox("🏠 현재 당사자와 동거 중", value=False)
         
         if st.form_submit_button("가족/동거인 추가하기") and f_name:
@@ -287,7 +287,8 @@ else:
                 ax.plot([x - box_s/2.2, x + box_s/2.2], [y + box_s/2.2, y - box_s/2.2], color='#D63031', lw=1.8, zorder=5)
 
             disp_txt = f"{name}\n({age}세)" if is_alive else f"{name}\n(사망)"
-            ax.text(x, y - box_s/2 - 0.07, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
+            # [수정] 텍스트를 도형에 바짝 붙임 (-0.07 -> -0.03) 관계선과의 겹침 방지
+            ax.text(x, y - box_s/2 - 0.03, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                     ha='center', va='top', color='#2D3436', zorder=5)
 
         cx, cy = (0, 0.85) if (not spouse and not cohabitants) else (-0.45, 0.85)
@@ -300,7 +301,7 @@ else:
             draw_person(sx, sy, sp['name'], sp['age'], sp['gender'], sp['is_alive'])
             if sp.get('is_cohabit', False): cohabit_points.append((sx, sy))
 
-            rel = sp.get('rel_type', '동거/혼인')
+            rel = sp.get('rel_type', '혼인')
             mid_x = (cx + sx) / 2
             lbl_bbox = dict(boxstyle="round,pad=0.2", fc="#FFFFFF", ec="none", alpha=0.85)
 
@@ -558,10 +559,10 @@ else:
 
     fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members)
     
-    # [수정포인트] 딱 중간 사이즈인 3.2 비율 동일 적용
-    col_g1, col_g2, col_g3 = st.columns([1, 3.2, 1])
+    col_g1, col_g2, col_g3 = st.columns([1, 4, 1])
     with col_g2:
-        st.pyplot(fig2, use_container_width=True)
+        # [수정] 빈 여백이 제거된 타이트한 이미지를 화면에 렌더링하여 버튼을 위로 끌어올림
         buf2 = io.BytesIO()
         fig2.savefig(buf2, format="png", bbox_inches='tight', pad_inches=0.02, dpi=300)
+        st.image(buf2, use_container_width=True)
         st.download_button(label="💾 가계도 이미지 다운로드", data=buf2.getvalue(), file_name=f"가계도_{st.session_state.gen_client['name']}.png", mime="image/png", use_container_width=True)
