@@ -236,7 +236,7 @@ else:
         f_name = st.text_input("이름/호칭 (예: 장남, 큰며느리, 차남 등)")
         f_gender = st.radio("성별", ["남성", "여성", "기타(반려동물)"], horizontal=True, key="fam_gender")
         f_age = st.text_input("나이 (사망 시 '사망' 입력)")
-        f_rel_type = st.selectbox("당사자/가족과의 관계 상태", ["동거/혼인", "사실혼", "동거인", "별거", "이혼", "불화/갈등", "소원", "단절", "보통", "밀접/친밀"])
+        f_rel_type = st.selectbox("당사자/가족과의 관계 상태", ["혼인", "사실혼", "동거인", "별거", "이혼", "불화/갈등", "소원", "단절", "보통", "밀접/친밀"])
         f_cohabit = st.checkbox("🏠 현재 당사자와 동거 중", value=False)
         
         if st.form_submit_button("가족/동거인 추가하기") and f_name:
@@ -306,7 +306,7 @@ else:
             draw_person(sx, sy, sp['name'], sp['age'], sp['gender'], sp['is_alive'])
             if sp.get('is_cohabit', False): cohabit_points.append((sx, sy))
 
-            rel = sp.get('rel_type', '동거/혼인')
+            rel = sp.get('rel_type', '혼인')
             mid_x = (cx + sx) / 2
             lbl_bbox = dict(boxstyle="round,pad=0.2", fc="#FFFFFF", ec="none", alpha=0.85)
 
