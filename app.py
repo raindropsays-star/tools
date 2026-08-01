@@ -128,6 +128,7 @@ if selected_tool == "🌳 사례관리 생태도":
         return center_x + dx * scale, center_y + dy * scale
 
     def draw_pretty_ecomap(nodes, client_name):
+        # [버튼 밀착 처리] 1:1 완벽한 비율로 내부 여백을 원천 차단
         fig, ax = plt.subplots(figsize=(5.5, 5.5), dpi=200)
         ax.set_aspect('equal')
         fig.patch.set_facecolor('#FFFFFF')
@@ -193,20 +194,22 @@ if selected_tool == "🌳 사례관리 생태도":
             arrow_patch = patches.FancyArrowPatch(p_from, p_to, arrowstyle=a_style, linestyle=style, linewidth=lw, color=color, mutation_scale=8.5, zorder=5)
             ax.add_patch(arrow_patch)
 
+        # 빈 여백 발생을 막기 위해 figsize 1:1 비율과 x,y 좌표계를 완전히 일치시킵니다.
         ax.set_xlim(-1.25, 1.25)
         ax.set_ylim(-1.25, 1.25)
+        
         plt.axis("off")
-        plt.tight_layout(pad=0.0)
+        fig.tight_layout(pad=0.0) # 내부 패딩 완벽 제거
         return fig
 
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
     
-    col_e1, col_e2, col_e3 = st.columns([1, 4, 1])
+    # [비율 고정] 가장 보기 좋았던 3.2 황금 비율 적용
+    col_e1, col_e2, col_e3 = st.columns([1, 3.2, 1])
     with col_e2:
-        # [수정] 빈 여백이 제거된 타이트한 이미지를 화면에 렌더링하여 버튼을 위로 끌어올림
+        st.pyplot(fig1, use_container_width=True)
         buf1 = io.BytesIO()
-        fig1.savefig(buf1, format="png", bbox_inches='tight', pad_inches=0.02, dpi=300)
-        st.image(buf1, use_container_width=True)
+        fig1.savefig(buf1, format="png", bbox_inches='tight', pad_inches=0.0, dpi=300)
         st.download_button(label="💾 생태도 이미지 다운로드", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png", use_container_width=True)
 
 # =============================================================
@@ -230,7 +233,7 @@ else:
         f_name = st.text_input("이름/호칭 (예: 장남, 큰며느리, 차남 등)")
         f_gender = st.radio("성별", ["남성", "여성", "기타(반려동물)"], horizontal=True, key="fam_gender")
         f_age = st.text_input("나이 (사망 시 '사망' 입력)")
-        f_rel_type = st.selectbox("당사자/가족과의 관계 상태", ["혼인", "사실혼", "동거인", "별거", "이혼", "불화/갈등", "소원", "단절", "보통", "밀접/친밀"])
+        f_rel_type = st.selectbox("당사자/가족과의 관계 상태", ["동거/혼인", "사실혼", "동거인", "별거", "이혼", "불화/갈등", "소원", "단절", "보통", "밀접/친밀"])
         f_cohabit = st.checkbox("🏠 현재 당사자와 동거 중", value=False)
         
         if st.form_submit_button("가족/동거인 추가하기") and f_name:
@@ -251,7 +254,8 @@ else:
             st.rerun()
 
     def draw_pretty_genogram(client, members):
-        fig, ax = plt.subplots(figsize=(5.5, 5.5), dpi=200)
+        # [버튼 밀착 처리] 가계도 역시 빈 흰색 여백이 없도록 1.4 비율(7.0x5.0)로 설정합니다.
+        fig, ax = plt.subplots(figsize=(7.0, 5.0), dpi=200)
         ax.set_aspect('equal') 
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
@@ -287,7 +291,7 @@ else:
                 ax.plot([x - box_s/2.2, x + box_s/2.2], [y + box_s/2.2, y - box_s/2.2], color='#D63031', lw=1.8, zorder=5)
 
             disp_txt = f"{name}\n({age}세)" if is_alive else f"{name}\n(사망)"
-            # [수정] 텍스트를 도형에 바짝 붙임 (-0.07 -> -0.03) 관계선과의 겹침 방지
+            # [이름 겹침 방지] 글씨를 도형 쪽에 완전히 바짝 붙여 밑에 지나가는 선들과의 충돌을 예방합니다.
             ax.text(x, y - box_s/2 - 0.03, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                     ha='center', va='top', color='#2D3436', zorder=5)
 
@@ -301,7 +305,7 @@ else:
             draw_person(sx, sy, sp['name'], sp['age'], sp['gender'], sp['is_alive'])
             if sp.get('is_cohabit', False): cohabit_points.append((sx, sy))
 
-            rel = sp.get('rel_type', '혼인')
+            rel = sp.get('rel_type', '동거/혼인')
             mid_x = (cx + sx) / 2
             lbl_bbox = dict(boxstyle="round,pad=0.2", fc="#FFFFFF", ec="none", alpha=0.85)
 
@@ -369,11 +373,12 @@ else:
                 ax.plot([0, cx], [p_mid_y, p_mid_y], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
                 ax.plot([cx, cx], [p_mid_y, cy + 0.1], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
 
-        # 3. 자녀 세대 배치
+        # 3. 자녀 세대 배치 (선 겹침 방지를 위해 branch_y 위치 조정)
         child_coords_map = {}
         if children:
             chy = 0.35
-            branch_y = 0.60
+            # [선 겹침 해결] 부모-자식 간의 가로 관계선(검은선) 높이를 0.55로 설정
+            branch_y = 0.55 
             
             family_groups = []
             for ch_idx, ch in enumerate(children):
@@ -443,7 +448,8 @@ else:
                 for ch_idx, ch in enumerate(children):
                     chx = child_coords_map[ch_idx]
                     ch_rel = ch.get('rel_type', '보통')
-                    ch_mid_y = (branch_y + chy) / 2
+                    # 자녀에게 내려오는 선분 중간에 표식을 위해 중심점 계산
+                    ch_mid_y = (branch_y + (chy + 0.1)) / 2 
                     lbl_bbox_small = dict(boxstyle="round,pad=0.15", fc="#FFFFFF", ec="none", alpha=0.85)
 
                     if ch_rel == '불화/갈등':
@@ -493,9 +499,17 @@ else:
             top_y = {gy: gy + 0.20 for gy in sorted_ys}
             bot_y = {gy: gy - 0.20 for gy in sorted_ys}
             
+            # [선 겹침 해결] 초록색 다각형의 수평선을 검은 선(0.55)과 만나지 않도록 (0.62 위치로) 분리합니다.
+            bridge_y = {}
+            for i in range(1, len(sorted_ys)):
+                top_layer = sorted_ys[i-1]
+                bot_layer = sorted_ys[i]
+                bridge_y[(top_layer, bot_layer)] = bot_y[top_layer] - 0.03
+
             verts = []
             codes = []
             
+            # 다각형 왼쪽 외곽선
             for i, gy in enumerate(sorted_ys):
                 mx = min_x[gy]
                 ty = top_y[gy]
@@ -505,7 +519,7 @@ else:
                     codes.append(mpath.Path.MOVETO)
                 else:
                     prev_gy = sorted_ys[i-1]
-                    mid_y = (bot_y[prev_gy] + ty) / 2.0
+                    mid_y = bridge_y[(prev_gy, gy)]
                     prev_mx = min_x[prev_gy]
                     verts.append((prev_mx, mid_y))
                     codes.append(mpath.Path.LINETO)
@@ -516,6 +530,7 @@ else:
                 verts.append((mx, by))
                 codes.append(mpath.Path.LINETO)
                 
+            # 다각형 오른쪽 외곽선
             reversed_ys = list(reversed(sorted_ys))
             for i, gy in enumerate(reversed_ys):
                 mx = max_x[gy]
@@ -526,7 +541,7 @@ else:
                     codes.append(mpath.Path.LINETO)
                 else:
                     prev_gy = reversed_ys[i-1]
-                    mid_y = (top_y[prev_gy] + by) / 2.0
+                    mid_y = bridge_y[(gy, prev_gy)]
                     prev_mx = max_x[prev_gy]
                     verts.append((prev_mx, mid_y))
                     codes.append(mpath.Path.LINETO)
@@ -550,19 +565,20 @@ else:
             mid_x_val = (min_x[sorted_ys[0]] + max_x[sorted_ys[0]]) / 2.0
             ax.text(mid_x_val, top_y_val + 0.03, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), ha='center', va='bottom', color='#1B5E20', zorder=1)
 
-        ax.set_xlim(-1.65, 1.65)
-        ax.set_ylim(-1.80, 1.50)
+        # 빈 여백을 방지하기 위해 1.4 Aspect Ratio(7.0 x 5.0)와 정확히 일치하는 좌표계 제한 적용
+        ax.set_xlim(-1.40, 1.40) # 폭 2.8
+        ax.set_ylim(-0.45, 1.55) # 높이 2.0 (2.8 / 2.0 = 1.4 비율 완성)
         
         plt.axis("off")
-        plt.tight_layout(pad=0.0)
+        fig.tight_layout(pad=0.0) # 내부 패딩 완벽 제거
         return fig
 
     fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members)
     
-    col_g1, col_g2, col_g3 = st.columns([1, 4, 1])
+    # [비율 고정] 생태도와 동일한 3.2 비율 적용 및 깜빡임 원천 차단
+    col_g1, col_g2, col_g3 = st.columns([1, 3.2, 1])
     with col_g2:
-        # [수정] 빈 여백이 제거된 타이트한 이미지를 화면에 렌더링하여 버튼을 위로 끌어올림
+        st.pyplot(fig2, use_container_width=True)
         buf2 = io.BytesIO()
-        fig2.savefig(buf2, format="png", bbox_inches='tight', pad_inches=0.02, dpi=300)
-        st.image(buf2, use_container_width=True)
+        fig2.savefig(buf2, format="png", bbox_inches='tight', pad_inches=0.0, dpi=300)
         st.download_button(label="💾 가계도 이미지 다운로드", data=buf2.getvalue(), file_name=f"가계도_{st.session_state.gen_client['name']}.png", mime="image/png", use_container_width=True)
