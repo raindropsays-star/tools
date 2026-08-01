@@ -2,6 +2,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import matplotlib.patches as patches
+import matplotlib.path as mpath
 import numpy as np
 import urllib.request
 import os
@@ -23,10 +24,10 @@ plt.rcParams['axes.unicode_minus'] = False
 
 st.set_page_config(page_title="사례관리 스마트 생태도/가계도 생성기", layout="wide")
 
-# 상단 마진을 살짝 당겨서 화면 꼭대기에 예쁘게 붙게 만듭니다.
+# 상단 여백을 극단적으로 줄여서 화면 맨 위로 바짝 붙입니다.
 st.markdown("""
 <style>
-    .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; margin-top: -30px !important; }
+    .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; margin-top: -50px !important; }
     header { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
@@ -65,7 +66,7 @@ selected_tool = st.sidebar.radio("원하시는 도구를 선택하세요", ["�
 st.sidebar.markdown("---")
 
 # =============================================================
-# [MODE 1] 생태도 모드 (안정적인 고정 사이즈)
+# [MODE 1] 생태도 모드
 # =============================================================
 if selected_tool == "🌳 사례관리 생태도":
     st.sidebar.header("🌳 [생태도] 정보 입력")
@@ -100,7 +101,6 @@ if selected_tool == "🌳 사례관리 생태도":
         if is_official: start_angle, end_angle = np.pi * 0.65, np.pi * 1.35
         else: start_angle, end_angle = -np.pi * 0.35, np.pi * 0.35
 
-        # 명칭 간격을 가장 보기 좋은 거리로 고정
         if count <= 4:
             radii = [0.60] * count
             angles = np.linspace(start_angle, end_angle, count + 2)[1:-1] if count > 1 else [(start_angle + end_angle)/2]
@@ -127,8 +127,9 @@ if selected_tool == "🌳 사례관리 생태도":
         return center_x + dx * scale, center_y + dy * scale
 
     def draw_pretty_ecomap(nodes, client_name):
-        # 크기를 아담하게 고정하여 거대해지는 현상 방지
-        fig, ax = plt.subplots(figsize=(5.5, 5.5), dpi=200)
+        # 1:1 완벽한 정비율 캔버스 (너무 크지 않게 아담한 사이즈로 축소)
+        fig, ax = plt.subplots(figsize=(5.0, 5.0), dpi=200)
+        ax.set_aspect('equal')
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
@@ -140,15 +141,15 @@ if selected_tool == "🌳 사례관리 생태도":
         pos.update(calculate_positions_ecomap(official, is_official=True))
         pos.update(calculate_positions_ecomap(unofficial, is_official=False))
 
-        circle_r = 0.95
+        circle_r = 0.90
         ax.add_patch(plt.Circle((0, 0), circle_r, color='#B2BEC3', fill=False, linestyle='-', linewidth=1.2))
         ax.plot([0, 0], [-circle_r, circle_r], color='#B2BEC3', linestyle='--', linewidth=1.5, zorder=1)
 
         bbox_official = dict(boxstyle="round,pad=0.30", fc="#E3F2FD", ec="#1E88E5", lw=1.5)
         bbox_unofficial = dict(boxstyle="round,pad=0.30", fc="#E8F5E9", ec="#43A047", lw=1.5)
 
-        ax.text(-0.48, circle_r, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10.0, weight='bold'), ha='center', va='center', color='#0D47A1', zorder=2, bbox=bbox_official)
-        ax.text(0.48, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10.0, weight='bold'), ha='center', va='center', color='#1B5E20', zorder=2, bbox=bbox_unofficial)
+        ax.text(-0.45, circle_r, "공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10.0, weight='bold'), ha='center', va='center', color='#0D47A1', zorder=2, bbox=bbox_official)
+        ax.text(0.45, circle_r, "비공식체계", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=10.0, weight='bold'), ha='center', va='center', color='#1B5E20', zorder=2, bbox=bbox_unofficial)
 
         center_r = 0.14
         ax.scatter(0, 0, s=1800, color='#FFEAA7', edgecolors='#FDCB6E', linewidth=2.0, zorder=2)
@@ -192,11 +193,11 @@ if selected_tool == "🌳 사례관리 생태도":
             arrow_patch = patches.FancyArrowPatch(p_from, p_to, arrowstyle=a_style, linestyle=style, linewidth=lw, color=color, mutation_scale=8.5, zorder=5)
             ax.add_patch(arrow_patch)
 
-        ax.text(0, -1.25, "↔ 쌍방향·강함     ➔ 일방향·보통     ---> 점선·약함", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#2D3436')
+        ax.text(0, -1.15, "↔ 쌍방향·강함     ➔ 일방향·보통     ---> 점선·약함", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=8, weight='bold'), ha='center', va='center', color='#2D3436')
         
-        # 내부 캔버스를 타이트하게 고정하여 위로 붙게 함
-        ax.set_xlim(-1.3, 1.3)
-        ax.set_ylim(-1.3, 1.3)
+        # 1:1 비율을 유지하면서 캔버스를 타이트하게 자르기
+        ax.set_xlim(-1.25, 1.25)
+        ax.set_ylim(-1.25, 1.25)
         plt.axis("off")
         plt.tight_layout(pad=0.0)
         return fig
@@ -204,15 +205,16 @@ if selected_tool == "🌳 사례관리 생태도":
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
     st.pyplot(fig1, use_container_width=False)
     
-    # 다운로드 버튼을 그림 바로 아래 정중앙에 편안하게 배치
+    # 다운로드 버튼을 중앙 하단에 안정적으로 배치
     buf1 = io.BytesIO()
     fig1.savefig(buf1, format="png", bbox_inches='tight', pad_inches=0.02, dpi=300)
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
         st.download_button(label="💾 생태도 이미지 다운로드", data=buf1.getvalue(), file_name=f"생태도_{st.session_state.client_name}.png", mime="image/png", use_container_width=True)
 
+
 # =============================================================
-# [MODE 2] 가계도 모드 (안정적인 고정 스케일 & 분리형 동거 영역)
+# [MODE 2] 가계도 모드 (단일 계단식 통합 영역 완벽 복구 + 정비율)
 # =============================================================
 else:
     st.sidebar.header("👨‍👩‍👧‍👦 [가계도] 정보 입력")
@@ -253,8 +255,9 @@ else:
             st.rerun()
 
     def draw_pretty_genogram(client, members):
-        # 캔버스가 마음대로 늘어나지 않도록 사이즈 고정
-        fig, ax = plt.subplots(figsize=(6.5, 4.8), dpi=200)
+        # 캔버스의 가로세로 비율(7.5 : 5.0 = 1.5 비율)을 정확히 수학적으로 매칭!
+        fig, ax = plt.subplots(figsize=(7.5, 5.0), dpi=200)
+        ax.set_aspect('equal') # 절대 늘어나거나 찌그러지지 않음
         fig.patch.set_facecolor('#FFFFFF')
         ax.set_facecolor('#FFFFFF')
 
@@ -292,13 +295,13 @@ else:
             ax.text(x, y - box_s/2 - 0.07, disp_txt, fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.5, weight='bold'),
                     ha='center', va='top', color='#2D3436', zorder=5)
 
-        # 1. 당사자 및 배우자 (Y좌표 0.80 고정)
-        cx, cy = (0, 0.80) if (not spouse and not cohabitants) else (-0.45, 0.80)
+        # 1. 당사자 및 배우자
+        cx, cy = (0, 0.85) if (not spouse and not cohabitants) else (-0.45, 0.85)
         draw_person(cx, cy, client['name'], client['age'], client['gender'], client['is_alive'], is_target=True)
         if client.get('is_cohabit', True): cohabit_points.append((cx, cy))
 
         if spouse:
-            sx, sy = (0.45, 0.80)
+            sx, sy = (0.45, 0.85)
             sp = spouse[0]
             draw_person(sx, sy, sp['name'], sp['age'], sp['gender'], sp['is_alive'])
             if sp.get('is_cohabit', False): cohabit_points.append((sx, sy))
@@ -341,7 +344,7 @@ else:
 
         if cohabitants and not spouse:
             coh = cohabitants[0]
-            coh_x, coh_y = (0.45, 0.80)
+            coh_x, coh_y = (0.45, 0.85)
             draw_person(coh_x, coh_y, coh['name'], coh['age'], coh['gender'], coh['is_alive'])
             if coh.get('is_cohabit', True): cohabit_points.append((coh_x, coh_y))
 
@@ -374,8 +377,8 @@ else:
         # 3. 자녀 세대 배치
         child_coords_map = {}
         if children:
-            chy = 0.30
-            branch_y = 0.55
+            chy = 0.35
+            branch_y = 0.60
             
             family_groups = []
             for ch_idx, ch in enumerate(children):
@@ -419,7 +422,7 @@ else:
                     if il.get('is_cohabit'): cohabit_points.append((il_x, chy))
 
                     if grand_children:
-                        gcy = -0.20
+                        gcy = -0.15
                         gc_mid = (ch_x + il_x) / 2
                         ax.plot([gc_mid, gc_mid], [chy, chy - 0.18], color='#2D3436', lw=1.2, zorder=1)
                         
@@ -468,49 +471,99 @@ else:
 
         # 5. 반려동물
         if pets:
-            pet_y = 0.30 if not children else -0.20
+            pet_y = 0.35 if not children else -0.15
             pet_x = 1.10
             for p_idx, pt in enumerate(pets):
                 px = pet_x - (p_idx * 0.28)
                 draw_person(px, pet_y, pt['name'], pt['age'], pt['gender'], pt['is_alive'])
                 if pt.get('is_cohabit'): cohabit_points.append((px, pet_y))
 
-        # 6. [원복 완료] 비동거인을 절대 포함하지 않는 가장 정확하고 깔끔한 개별/그룹형 동거 박스
+        # 6. [가장 좋았던 버전 100% 복구] 비동거인은 완벽히 피하는 '단일 연속 계단식' 동거 영역 박스!
         if len(cohabit_points) > 0:
-            pts = np.array(cohabit_points)
-            sorted_pts = pts[np.argsort(pts[:, 0])]
+            y_groups = {}
+            for px, py in cohabit_points:
+                found = False
+                for gy in y_groups.keys():
+                    if abs(gy - py) < 0.1:
+                        y_groups[gy].append(px)
+                        found = True
+                        break
+                if not found:
+                    y_groups[py] = [px]
             
-            groups = []
-            curr = [sorted_pts[0]]
-            # x 거리가 가까운 사람끼리만 같은 그룹으로 묶습니다.
-            for pt in sorted_pts[1:]:
-                if pt[0] - curr[-1][0] < 0.6:  
-                    curr.append(pt)
+            sorted_ys = sorted(y_groups.keys(), reverse=True)
+            
+            min_x = {gy: min(y_groups[gy]) - 0.23 for gy in sorted_ys}
+            max_x = {gy: max(y_groups[gy]) + 0.23 for gy in sorted_ys}
+            top_y = {gy: gy + 0.22 for gy in sorted_ys}
+            bot_y = {gy: gy - 0.22 for gy in sorted_ys}
+            
+            verts = []
+            codes = []
+            
+            # 왼쪽 라인 연결
+            for i, gy in enumerate(sorted_ys):
+                mx = min_x[gy]
+                ty = top_y[gy]
+                by = bot_y[gy]
+                if i == 0:
+                    verts.append((mx, ty))
+                    codes.append(mpath.Path.MOVETO)
                 else:
-                    groups.append(np.array(curr))
-                    curr = [pt]
-            groups.append(np.array(curr))
-
-            for g_idx, g_pts in enumerate(groups):
-                g_min_x, g_max_x = min(g_pts[:, 0]) - 0.18, max(g_pts[:, 0]) + 0.18
-                g_min_y, g_max_y = min(g_pts[:, 1]) - 0.18, max(g_pts[:, 1]) + 0.18
-                gw, gh = g_max_x - g_min_x, g_max_y - g_min_y
+                    prev_gy = sorted_ys[i-1]
+                    mid_y = (bot_y[prev_gy] + ty) / 2.0
+                    prev_mx = min_x[prev_gy]
+                    verts.append((prev_mx, mid_y))
+                    codes.append(mpath.Path.LINETO)
+                    verts.append((mx, mid_y))
+                    codes.append(mpath.Path.LINETO)
+                    verts.append((mx, ty))
+                    codes.append(mpath.Path.LINETO)
+                verts.append((mx, by))
+                codes.append(mpath.Path.LINETO)
                 
-                co_bubble = patches.FancyBboxPatch(
-                    (g_min_x, g_min_y), gw, gh,
-                    boxstyle="round,pad=0.08,rounding_size=0.15",
-                    facecolor="#E8F5E9", edgecolor="#2E7D32", linestyle="--", linewidth=1.8, alpha=0.35, zorder=0
-                )
-                ax.add_patch(co_bubble)
+            # 오른쪽 라인 연결
+            reversed_ys = list(reversed(sorted_ys))
+            for i, gy in enumerate(reversed_ys):
+                mx = max_x[gy]
+                by = bot_y[gy]
+                ty = top_y[gy]
+                if i == 0:
+                    verts.append((mx, by))
+                    codes.append(mpath.Path.LINETO)
+                else:
+                    prev_gy = reversed_ys[i-1]
+                    mid_y = (top_y[prev_gy] + by) / 2.0
+                    prev_mx = max_x[prev_gy]
+                    verts.append((prev_mx, mid_y))
+                    codes.append(mpath.Path.LINETO)
+                    verts.append((mx, mid_y))
+                    codes.append(mpath.Path.LINETO)
+                    verts.append((mx, by))
+                    codes.append(mpath.Path.LINETO)
+                verts.append((mx, ty))
+                codes.append(mpath.Path.LINETO)
                 
-                # 그룹마다 상단에 동거 표시
-                ax.text((g_min_x + g_max_x)/2, g_max_y + 0.05, "🏠 동거 가족", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.0, weight='bold'), ha='center', va='bottom', color='#1B5E20', zorder=1)
+            verts.append((min_x[sorted_ys[0]], top_y[sorted_ys[0]]))
+            codes.append(mpath.Path.CLOSEPOLY)
+            
+            path = mpath.Path(verts, codes)
+            patch = patches.PathPatch(path, facecolor="#E8F5E9", edgecolor="#2E7D32", 
+                                      linestyle="--", linewidth=2.5, alpha=0.35, 
+                                      zorder=0, joinstyle='round', capstyle='round')
+            ax.add_patch(patch)
+            
+            top_y_val = top_y[sorted_ys[0]]
+            mid_x_val = (min_x[sorted_ys[0]] + max_x[sorted_ys[0]]) / 2.0
+            ax.text(mid_x_val, top_y_val + 0.03, "🏠 동거 가족 영역", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=7.5, weight='bold'), ha='center', va='bottom', color='#1B5E20', zorder=1)
 
-        ax.text(0, -0.45, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#636E72')
+        ax.text(0, -0.40, "□ 남성  ○ 여성  💎 반려동물  [X] 사망  [사실혼/동거인/이혼/별거/불화/소원/단절] 한글표기", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=6.8, weight='bold'), ha='center', va='center', color='#636E72')
         
-        # 캔버스가 늘어나지 않도록 좌표계를 단단하게 고정합니다.
-        ax.set_xlim(-1.40, 1.40)
-        ax.set_ylim(-0.55, 1.35)
+        # [수학적 비율 고정] 가로세로 7.5 : 5.0 비율 (1.5)에 정확히 맞춘 타이트한 좌표 제한
+        # x_range = 3.0 (-1.5 ~ 1.5) / y_range = 2.0 (-0.5 ~ 1.5) -> 정확히 1.5 비율
+        ax.set_xlim(-1.50, 1.50)
+        ax.set_ylim(-0.50, 1.50)
+        
         plt.axis("off")
         plt.tight_layout(pad=0.0)
         return fig
@@ -518,9 +571,9 @@ else:
     fig2 = draw_pretty_genogram(st.session_state.gen_client, st.session_state.family_members)
     st.pyplot(fig2, use_container_width=False)
     
-    # 다운로드 버튼을 그림 바로 아래 정중앙에 편안하게 배치
+    # 누르기 쉽도록 그림 바로 아래 정중앙에 배치
     buf2 = io.BytesIO()
     fig2.savefig(buf2, format="png", bbox_inches='tight', pad_inches=0.02, dpi=300)
-    col1, col2, col3 = st.columns([1, 2, 1])
+    col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
         st.download_button(label="💾 가계도 이미지 다운로드", data=buf2.getvalue(), file_name=f"가계도_{st.session_state.gen_client['name']}.png", mime="image/png", use_container_width=True)
