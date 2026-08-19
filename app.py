@@ -24,7 +24,6 @@ plt.rcParams['axes.unicode_minus'] = False
 
 st.set_page_config(page_title="사례관리 스마트 생태도/가계도 생성기", layout="wide")
 
-# [핵심] 스케일 유지 + 스크롤 방지를 위해 스트림릿의 숨겨진 모든 수직 여백을 극한으로 깎아냅니다.
 st.markdown("""
 <style>
     .block-container { 
@@ -34,7 +33,6 @@ st.markdown("""
     }
     header { display: none !important; }
     div[data-testid="column"] { transition: none !important; } 
-    /* 이미지와 다운로드 버튼 사이의 불필요한 간격을 없애 버튼을 위로 끌어올립니다. */
     div[data-testid="stImage"] { margin-bottom: -1.5rem !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -100,22 +98,36 @@ if selected_tool == "🌳 사례관리 생태도":
             st.session_state.nodes.pop(i)
             st.rerun()
 
+    # [핵심 수정] 생태도 위치 계산 로직 (겹침 방지 완벽 적용)
     def calculate_positions_ecomap(node_list, is_official):
         positions = {}
         count = len(node_list)
         if count == 0: return positions
 
-        if is_official: start_angle, end_angle = np.pi * 0.65, np.pi * 1.35
-        else: start_angle, end_angle = -np.pi * 0.35, np.pi * 0.35
+        # 각도 범위를 넓혀서 체계가 많아도 답답하지 않게 공간을 확보합니다.
+        if is_official: 
+            start_angle, end_angle = np.pi * 0.60, np.pi * 1.40
+        else: 
+            start_angle, end_angle = -np.pi * 0.40, np.pi * 0.40
 
         if count <= 4:
             radii = [0.60] * count
             angles = np.linspace(start_angle, end_angle, count + 2)[1:-1] if count > 1 else [(start_angle + end_angle)/2]
         else:
-            half = (count + 1) // 2
-            radii = [0.55] * half + [0.72] * (count - half)
-            angles_inner = np.linspace(start_angle, end_angle, half + 2)[1:-1]
-            angles_outer = np.linspace(start_angle, end_angle, (count - half) + 2)[1:-1]
+            # 5개 이상일 경우 2열 배치
+            inner_count = (count + 1) // 2
+            outer_count = count - inner_count
+            
+            # [수정] 안쪽 궤도와 바깥쪽 궤도의 거리를 확 벌려 상자 겹침을 원천 차단합니다.
+            r_inner = 0.45
+            r_outer = 0.85 
+
+            radii = [r_inner] * inner_count + [r_outer] * outer_count
+
+            # 안쪽 열과 바깥쪽 열의 각도를 각각 균등 분배하여 자연스럽게 지그재그(교차)되도록 유도합니다.
+            angles_inner = np.linspace(start_angle, end_angle, inner_count + 2)[1:-1]
+            angles_outer = np.linspace(start_angle, end_angle, outer_count + 2)[1:-1]
+            
             angles = list(angles_inner) + list(angles_outer)
 
         for idx, n in enumerate(node_list):
@@ -207,7 +219,6 @@ if selected_tool == "🌳 사례관리 생태도":
 
     fig1 = draw_pretty_ecomap(st.session_state.nodes, st.session_state.client_name)
     
-    # [비율 고정] 3.0~3.1 비율로 화면에 꽉 차면서도 스크롤을 유발하지 않도록 최적화
     col_e1, col_e2, col_e3 = st.columns([1, 3.0, 1])
     with col_e2:
         buf1 = io.BytesIO()
@@ -230,19 +241,25 @@ else:
 
     st.sidebar.markdown("---")
     
+    current_children = [m['name'] for m in st.session_state.family_members if "자녀" in m['relation']]
+    parent_options = ["선택 안함 (해당없음)"] + current_children
+
     with st.sidebar.form("add_family_form"):
         st.subheader("➕ 가족/동거인 추가")
         f_rel = st.selectbox("관계 구분", ["배우자", "자녀", "동거인", "사위/며느리", "손자/손녀", "부(아버지)", "모(어머니)", "반려동물"])
         f_name = st.text_input("이름/호칭 (예: 장남, 큰며느리, 차남 등)")
+        f_parent = st.selectbox("어느 자녀의 아이인가요? (손자/손녀 추가 시 필수)", parent_options)
         f_gender = st.radio("성별", ["남성", "여성", "기타(반려동물)"], horizontal=True, key="fam_gender")
         f_age = st.text_input("나이 (사망 시 '사망' 입력)")
-        f_rel_type = st.selectbox("당사자/가족과의 관계 상태", ["혼인", "사실혼", "동거인", "별거", "이혼", "불화/갈등", "소원", "단절", "보통", "밀접/친밀"])
+        f_rel_type = st.selectbox("당사자/가족과의 관계 상태", ["동거/혼인", "사실혼", "동거인", "별거", "이혼", "불화/갈등", "소원", "단절", "보통", "밀접/친밀"])
         f_cohabit = st.checkbox("🏠 현재 당사자와 동거 중", value=False)
         
         if st.form_submit_button("가족/동거인 추가하기") and f_name:
             is_alive = False if f_age == "사망" else True
             st.session_state.family_members.append({
-                "relation": f_rel, "name": f_name, "gender": f_gender, "age": f_age, "is_alive": is_alive, "rel_type": f_rel_type, "is_cohabit": f_cohabit
+                "relation": f_rel, "name": f_name, "gender": f_gender, "age": f_age, "is_alive": is_alive, 
+                "rel_type": f_rel_type, "is_cohabit": f_cohabit, 
+                "parent": f_parent if f_parent != "선택 안함 (해당없음)" else None
             })
             st.rerun()
 
@@ -306,7 +323,7 @@ else:
             draw_person(sx, sy, sp['name'], sp['age'], sp['gender'], sp['is_alive'])
             if sp.get('is_cohabit', False): cohabit_points.append((sx, sy))
 
-            rel = sp.get('rel_type', '혼인')
+            rel = sp.get('rel_type', '동거/혼인')
             mid_x = (cx + sx) / 2
             lbl_bbox = dict(boxstyle="round,pad=0.2", fc="#FFFFFF", ec="none", alpha=0.85)
 
@@ -374,7 +391,7 @@ else:
                 ax.plot([0, cx], [p_mid_y, p_mid_y], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
                 ax.plot([cx, cx], [p_mid_y, cy + 0.1], color='#B2BEC3', linestyle=':', lw=1.2, zorder=1)
 
-        # 3. 자녀 세대 배치 (선 겹침 및 간격 자동 조절 로직)
+        # 3. 자녀 세대 배치
         child_coords_map = {}
         if children:
             chy = 0.35
@@ -401,11 +418,27 @@ else:
             for g_idx, group in enumerate(family_groups):
                 gx = group_xs[g_idx]
                 ch = group['child']
+                
+                my_gcs = [gc for gc in grand_children if gc.get('parent') == ch['name']]
 
                 if group['type'] == 'single':
                     draw_person(gx, chy, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
                     child_coords_map[group['child_idx']] = gx
                     if ch.get('is_cohabit'): cohabit_points.append((gx, chy))
+                    
+                    if my_gcs:
+                        gcy = -0.15
+                        gc_mid = gx
+                        ax.plot([gc_mid, gc_mid], [chy - 0.09, chy - 0.18], color='#2D3436', lw=1.2, zorder=1)
+                        gc_xs = list(np.linspace(gc_mid - 0.22, gc_mid + 0.22, len(my_gcs))) if len(my_gcs) > 1 else [gc_mid]
+                        if len(my_gcs) > 1:
+                            ax.plot([gc_xs[0], gc_xs[-1]], [chy - 0.18, chy - 0.18], color='#2D3436', lw=1.2, zorder=1)
+                        for gc_idx, gc in enumerate(my_gcs):
+                            grx = gc_xs[gc_idx]
+                            draw_person(grx, gcy, gc['name'], gc['age'], gc['gender'], gc['is_alive'])
+                            ax.plot([grx, grx], [chy - 0.18, gcy + 0.1], color='#2D3436', lw=1.2, zorder=1)
+                            if gc.get('is_cohabit'): cohabit_points.append((grx, gcy))
+
                 else:
                     il = group['in_law']
                     ch_x = gx - 0.15
@@ -420,17 +453,17 @@ else:
                     if ch.get('is_cohabit'): cohabit_points.append((ch_x, chy))
                     if il.get('is_cohabit'): cohabit_points.append((il_x, chy))
 
-                    if grand_children:
+                    if my_gcs:
                         gcy = -0.15
                         gc_mid = (ch_x + il_x) / 2
                         ax.plot([gc_mid, gc_mid], [chy, chy - 0.18], color='#2D3436', lw=1.2, zorder=1)
                         
-                        gc_xs = list(np.linspace(gc_mid - 0.22, gc_mid + 0.22, len(grand_children))) if len(grand_children) > 1 else [gc_mid]
-                        if len(grand_children) > 1:
+                        gc_xs = list(np.linspace(gc_mid - 0.22, gc_mid + 0.22, len(my_gcs))) if len(my_gcs) > 1 else [gc_mid]
+                        if len(my_gcs) > 1:
                             ax.plot([gc_xs[0], gc_xs[-1]], [chy - 0.18, chy - 0.18], color='#2D3436', lw=1.2, zorder=1)
 
-                        for g_idx, gc in enumerate(grand_children):
-                            grx = gc_xs[g_idx]
+                        for gc_idx, gc in enumerate(my_gcs):
+                            grx = gc_xs[gc_idx]
                             draw_person(grx, gcy, gc['name'], gc['age'], gc['gender'], gc['is_alive'])
                             ax.plot([grx, grx], [chy - 0.18, gcy + 0.1], color='#2D3436', lw=1.2, zorder=1)
                             if gc.get('is_cohabit'): cohabit_points.append((grx, gcy))
