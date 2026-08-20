@@ -98,40 +98,32 @@ if selected_tool == "🌳 사례관리 생태도":
             st.session_state.nodes.pop(i)
             st.rerun()
 
-    # [핵심 수정] 생태도 위치 계산 로직 (겹침 방지 완벽 적용)
     def calculate_positions_ecomap(node_list, is_official):
         positions = {}
         count = len(node_list)
         if count == 0: return positions
 
-        # 각도 범위를 넓혀서 체계가 많아도 답답하지 않게 공간을 확보합니다.
-        if is_official: 
-            start_angle, end_angle = np.pi * 0.60, np.pi * 1.40
-        else: 
-            start_angle, end_angle = -np.pi * 0.40, np.pi * 0.40
-
         if count <= 4:
+            if is_official: 
+                start_angle, end_angle = np.pi * 0.65, np.pi * 1.35
+            else: 
+                start_angle, end_angle = np.pi * 0.35, -np.pi * 0.35
+                
             radii = [0.60] * count
             angles = np.linspace(start_angle, end_angle, count + 2)[1:-1] if count > 1 else [(start_angle + end_angle)/2]
+            
+            for idx, n in enumerate(node_list):
+                positions[n['name']] = (radii[idx] * np.cos(angles[idx]), radii[idx] * np.sin(angles[idx]))
         else:
-            # 5개 이상일 경우 2열 배치
-            inner_count = (count + 1) // 2
-            outer_count = count - inner_count
+            sign = -1 if is_official else 1
+            y_max = 0.64 
+            y_vals = np.linspace(y_max, -y_max, count)
             
-            # [수정] 안쪽 궤도와 바깥쪽 궤도의 거리를 확 벌려 상자 겹침을 원천 차단합니다.
-            r_inner = 0.45
-            r_outer = 0.85 
-
-            radii = [r_inner] * inner_count + [r_outer] * outer_count
-
-            # 안쪽 열과 바깥쪽 열의 각도를 각각 균등 분배하여 자연스럽게 지그재그(교차)되도록 유도합니다.
-            angles_inner = np.linspace(start_angle, end_angle, inner_count + 2)[1:-1]
-            angles_outer = np.linspace(start_angle, end_angle, outer_count + 2)[1:-1]
-            
-            angles = list(angles_inner) + list(angles_outer)
-
-        for idx, n in enumerate(node_list):
-            positions[n['name']] = (radii[idx] * np.cos(angles[idx]), radii[idx] * np.sin(angles[idx]))
+            for idx, n in enumerate(node_list):
+                y = y_vals[idx]
+                x_mag = 0.46 * np.sqrt(1 - (y / 0.85)**2)
+                positions[n['name']] = (sign * x_mag, y)
+                
         return positions
 
     def get_box_intersection_precise(center_x, center_y, width, height, target_x, target_y):
@@ -447,7 +439,42 @@ else:
                     draw_person(ch_x, chy, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
                     draw_person(il_x, chy, il['name'], il['age'], il['gender'], il['is_alive'])
                     
-                    ax.plot([ch_x + 0.09, il_x - 0.09], [chy, chy], color='#2D3436', lw=1.2, zorder=2)
+                    # [핵심 수정] 자녀와 배우자(사위/며느리) 사이의 관계선(이혼/별거 등) 반영
+                    il_rel = il.get('rel_type', '보통')
+                    mid_il_x = (ch_x + il_x) / 2
+                    lbl_bbox_il = dict(boxstyle="round,pad=0.15", fc="#FFFFFF", ec="none", alpha=0.85)
+
+                    if il_rel == '사실혼':
+                        ax.plot([ch_x + 0.09, il_x - 0.09], [chy, chy], color='#2D3436', linestyle='--', lw=1.2, zorder=2)
+                        ax.text(mid_il_x, chy + 0.06, "사실혼", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=5.5, weight='bold'), ha='center', va='center', color='#27AE60', zorder=4, bbox=lbl_bbox_il)
+                    elif il_rel == '이혼':
+                        ax.plot([ch_x + 0.09, il_x - 0.09], [chy, chy], color='#2D3436', lw=1.2, zorder=2)
+                        ax.plot([mid_il_x - 0.03, mid_il_x - 0.01], [chy - 0.04, chy + 0.04], color='#D63031', lw=1.5, zorder=3)
+                        ax.plot([mid_il_x + 0.01, mid_il_x + 0.03], [chy - 0.04, chy + 0.04], color='#D63031', lw=1.5, zorder=3)
+                        ax.text(mid_il_x, chy + 0.06, "이혼", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=5.5, weight='bold'), ha='center', va='center', color='#D63031', zorder=4, bbox=lbl_bbox_il)
+                    elif il_rel == '별거':
+                        ax.plot([ch_x + 0.09, il_x - 0.09], [chy, chy], color='#2D3436', lw=1.2, zorder=2)
+                        ax.plot([mid_il_x, mid_il_x + 0.02], [chy - 0.04, chy + 0.04], color='#E67E22', lw=1.5, zorder=3)
+                        ax.text(mid_il_x, chy + 0.06, "별거", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=5.5, weight='bold'), ha='center', va='center', color='#E67E22', zorder=4, bbox=lbl_bbox_il)
+                    elif il_rel == '불화/갈등':
+                        xs = np.linspace(ch_x + 0.09, il_x - 0.09, 15)
+                        ys = chy + 0.015 * np.sin((xs - ch_x) * 40)
+                        ax.plot(xs, ys, color='#D63031', lw=1.5, zorder=2)
+                        ax.text(mid_il_x, chy + 0.06, "불화", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=5.5, weight='bold'), ha='center', va='center', color='#D63031', zorder=4, bbox=lbl_bbox_il)
+                    elif il_rel == '소원':
+                        ax.plot([ch_x + 0.09, il_x - 0.09], [chy, chy], color='#7F8C8D', linestyle='--', lw=1.2, zorder=2)
+                        ax.text(mid_il_x, chy + 0.06, "소원", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=5.5, weight='bold'), ha='center', va='center', color='#7F8C8D', zorder=4, bbox=lbl_bbox_il)
+                    elif il_rel == '단절':
+                        ax.plot([ch_x + 0.09, il_x - 0.09], [chy, chy], color='#2D3436', lw=1.2, zorder=2)
+                        ax.plot([mid_il_x - 0.02, mid_il_x + 0.02], [chy - 0.03, chy + 0.03], color='#2D3436', lw=1.5, zorder=3)
+                        ax.plot([mid_il_x - 0.02, mid_il_x + 0.02], [chy + 0.03, chy - 0.03], color='#2D3436', lw=1.5, zorder=3)
+                        ax.text(mid_il_x, chy + 0.06, "단절", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=5.5, weight='bold'), ha='center', va='center', color='#2D3436', zorder=4, bbox=lbl_bbox_il)
+                    elif il_rel == '밀접/친밀':
+                        ax.plot([ch_x + 0.09, il_x - 0.09], [chy + 0.012, chy + 0.012], color='#1976D2', lw=1.5, zorder=2)
+                        ax.plot([ch_x + 0.09, il_x - 0.09], [chy - 0.012, chy - 0.012], color='#1976D2', lw=1.5, zorder=2)
+                        ax.text(mid_il_x, chy + 0.06, "친밀", fontproperties=fm.FontProperties(fname="NanumGothic.ttf", size=5.5, weight='bold'), ha='center', va='center', color='#1976D2', zorder=4, bbox=lbl_bbox_il)
+                    else:
+                        ax.plot([ch_x + 0.09, il_x - 0.09], [chy, chy], color='#2D3436', lw=1.2, zorder=2)
                     
                     child_coords_map[group['child_idx']] = ch_x
                     if ch.get('is_cohabit'): cohabit_points.append((ch_x, chy))
