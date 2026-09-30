@@ -287,15 +287,28 @@ else:
             edge_c = '#FDCB6E' if is_target else ('#1976D2' if gender == '남성' else ('#C2185B' if gender == '여성' else '#388E3C'))
             lw = 2.2 if is_target else 1.5
 
+            # [핵심] 당사자인 경우(is_target=True) 내부에 조금 더 작은 도형을 그려 이중선 처리
             if gender == '남성':
                 rect = patches.Rectangle((x - box_s/2, y - box_s/2), box_s, box_s, facecolor=color, edgecolor=edge_c, linewidth=lw, zorder=4)
                 ax.add_patch(rect)
+                if is_target:
+                    inner_s = box_s - 0.045
+                    inner_rect = patches.Rectangle((x - inner_s/2, y - inner_s/2), inner_s, inner_s, facecolor='none', edgecolor=edge_c, linewidth=lw, zorder=4.1)
+                    ax.add_patch(inner_rect)
             elif gender == '여성':
                 circle = patches.Circle((x, y), box_s/2, facecolor=color, edgecolor=edge_c, linewidth=lw, zorder=4)
                 ax.add_patch(circle)
+                if is_target:
+                    inner_s = box_s - 0.045
+                    inner_circle = patches.Circle((x, y), inner_s/2, facecolor='none', edgecolor=edge_c, linewidth=lw, zorder=4.1)
+                    ax.add_patch(inner_circle)
             else:
                 diamond = patches.RegularPolygon((x, y), numVertices=4, radius=box_s/1.6, facecolor=color, edgecolor=edge_c, linewidth=lw, zorder=4)
                 ax.add_patch(diamond)
+                if is_target:
+                    inner_s = box_s - 0.045
+                    inner_diamond = patches.RegularPolygon((x, y), numVertices=4, radius=inner_s/1.6, facecolor='none', edgecolor=edge_c, linewidth=lw, zorder=4.1)
+                    ax.add_patch(inner_diamond)
 
             if not is_alive:
                 ax.plot([x - box_s/2.2, x + box_s/2.2], [y - box_s/2.2, y + box_s/2.2], color='#D63031', lw=1.8, zorder=5)
@@ -439,7 +452,6 @@ else:
                     draw_person(ch_x, chy, ch['name'], ch['age'], ch['gender'], ch['is_alive'])
                     draw_person(il_x, chy, il['name'], il['age'], il['gender'], il['is_alive'])
                     
-                    # [핵심 수정] 자녀와 배우자(사위/며느리) 사이의 관계선(이혼/별거 등) 반영
                     il_rel = il.get('rel_type', '보통')
                     mid_il_x = (ch_x + il_x) / 2
                     lbl_bbox_il = dict(boxstyle="round,pad=0.15", fc="#FFFFFF", ec="none", alpha=0.85)
